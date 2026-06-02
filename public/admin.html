@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>卡密管理后台</title>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <!-- 登录面板 -->
+  <div id="login-panel" class="admin-login">
+    <h2>🔐 管理员登录</h2>
+    <input type="password" id="admin-key" placeholder="请输入管理密码" onkeydown="if(event.key==='Enter')login()">
+    <button class="btn-primary" style="width:100%" onclick="login()">登录</button>
+    <p id="login-err" style="color:#e05252;font-size:13px;margin-top:8px"></p>
+  </div>
+
+  <!-- 管理面板 -->
+  <div id="admin-panel" class="admin-wrap" style="display:none">
+
+    <div class="admin-toolbar">
+      <h2>卡密管理后台</h2>
+      <button class="btn-primary" onclick="showGenPanel()">+ 批量生成</button>
+      <button class="btn-primary" style="background:#18a058" onclick="exportCSV()">导出 CSV</button>
+      <button class="btn-warn" onclick="logout()">退出</button>
+    </div>
+
+    <!-- 生成面板 -->
+    <div class="gen-panel" id="gen-panel" style="display:none">
+      <label>数量</label>
+      <input type="number" id="gen-count" value="5" min="1" max="100">
+      <label>有效天数</label>
+      <input type="number" id="gen-days" value="30" min="1" max="3650">
+      <button class="btn-primary" onclick="generateCards()">生成</button>
+      <button class="btn-warn" onclick="document.getElementById('gen-panel').style.display='none'">取消</button>
+      <div id="gen-result" style="font-size:13px;color:#18a058;margin-left:8px"></div>
+    </div>
+
+    <!-- 搜索 -->
+    <div style="margin-bottom:12px">
+      <input id="search-input" type="text" placeholder="搜索卡密 / IP..."
+        style="padding:9px 13px;border:1.5px solid #ddd;border-radius:10px;font-size:14px;width:260px;outline:none"
+        oninput="renderTable()">
+    </div>
+
+    <table id="cards-table">
+      <thead>
+        <tr>
+          <th>卡密</th>
+          <th>状态</th>
+          <th>有效期</th>
+          <th>到期时间</th>
+          <th>绑定 IP</th>
+          <th>操作</th>
+        </tr>
+      </thead>
+      <tbody id="table-body"></tbody>
+    </table>
+
+    <p style="font-size:12px;color:#aaa;margin-top:10px" id="card-count"></p>
+  </div>
+
+  <div class="toast" id="toast"></div>
+  <script src="/js/admin.js"></script>
+</body>
+</html>
