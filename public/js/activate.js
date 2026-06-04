@@ -185,8 +185,17 @@ async function pollTaskStatus(resEl, retries = 15) {
         resEl.style.background = '#fff5f5';
         resEl.style.borderColor = '#fca5a5';
         resEl.style.color = '#991b1b';
-        resEl.textContent = '✗ 登录失败：' + (data.result && data.result.message || '未知错误');
-        showToast('登录失败');
+        const errCode = data.result && data.result.errorCode;
+        let errMsg = '登录失败';
+        if (errCode === 'QR_EXPIRED') {
+          errMsg = '❌ 二维码已过期！请重新打开 APP 获取新的二维码，截图后立即上传（需在1分钟内完成）';
+        } else if (errCode === 'PUSH_FAILED') {
+          errMsg = '❌ 设备未连接，请联系客服';
+        } else {
+          errMsg = '❌ 登录失败，请重试';
+        }
+        resEl.textContent = errMsg;
+        showToast('登录失败，请重试');
         return;
       }
       resEl.textContent = `⏳ 处理中... (${i + 1}/${retries})`;
