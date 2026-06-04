@@ -178,23 +178,23 @@ async function pollTaskStatus(resEl, retries = 15) {
         resEl.style.background = '#f0fdf4';
         resEl.style.borderColor = '#86efac';
         resEl.style.color = '#166534';
-        resEl.textContent = '✓ 登录成功！';
-        showToast('登录成功！');
+        resEl.innerHTML = '✅ 登录成功！<br><strong style="font-size:15px">请返回腾讯体育 APP 查看登录状态</strong>';
+        showToast('登录成功！请返回腾讯体育 APP');
         return;
       } else if (data.status === 'failed') {
         resEl.style.background = '#fff5f5';
         resEl.style.borderColor = '#fca5a5';
         resEl.style.color = '#991b1b';
         const errCode = data.result && data.result.errorCode;
-        let errMsg = '登录失败';
+        let errMsg = '';
         if (errCode === 'QR_EXPIRED') {
-          errMsg = '❌ 二维码已过期！请重新打开 APP 获取新的二维码，截图后立即上传（需在1分钟内完成）';
+          errMsg = '❌ 二维码已过期！<br>请返回腾讯体育 APP 刷新二维码，截图后立即上传（需在1分钟内完成）';
         } else if (errCode === 'PUSH_FAILED') {
           errMsg = '❌ 设备未连接，请联系客服';
         } else {
-          errMsg = '❌ 登录失败，请重试';
+          errMsg = '❌ 登录失败，请重试<br>请返回腾讯体育 APP 重新获取二维码';
         }
-        resEl.textContent = errMsg;
+        resEl.innerHTML = errMsg;
         showToast('登录失败，请重试');
         return;
       }
