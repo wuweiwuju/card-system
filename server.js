@@ -276,7 +276,12 @@ app.post('/api/scan-qr', upload.single('image'), async (req, res) => {
       const result = await callLoginApi(req.file.buffer, req.file.mimetype, req.file.originalname);
 
       if (result.status !== 200 && result.status !== 202) {
-        return res.json({ code: 502, msg: '登录接口返回错误', data: result.body });
+        const isDown = result.status === 503 || result.status === 502 || result.status === 504;
+        return res.json({
+          code: 502,
+          msg: isDown ? '服务暂时不可用，请稍后重试' : '登录接口返回错误',
+          data: result.body
+        });
       }
 
       const submitResult = result.body;

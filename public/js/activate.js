@@ -162,10 +162,15 @@ async function uploadQR(input) {
       resEl.style.color = '#166534';
       resEl.textContent = '✓ ' + msg;
     } else {
-      resEl.style.background = '#fff5f5';
-      resEl.style.borderColor = '#fca5a5';
-      resEl.style.color = '#991b1b';
-      resEl.textContent = '✗ ' + msg;
+      resEl.style.background = '#fee2e2';
+      resEl.style.borderColor = '#dc2626';
+      resEl.style.color = '#7f1d1d';
+      resEl.style.fontSize = '14px';
+      resEl.style.lineHeight = '1.7';
+      resEl.innerHTML = `
+        <div style="font-size:17px;font-weight:800;margin-bottom:6px">⚠️ 服务暂时不可用</div>
+        <div style="font-size:13px">请稍等几分钟后重新上传，或联系客服</div>
+      `;
     }
   } catch (e) {
     resEl.textContent = '✗ 上传失败：' + e.message;
