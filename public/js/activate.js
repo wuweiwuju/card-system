@@ -48,13 +48,46 @@ async function loadCardInfo() {
     if (data.status === 'expired') {
       showToast('该卡密已过期');
       expiresEl.style.color = '#e05252';
+      showStatusBlock('expired');
     }
     if (data.status === 'disabled') {
-      showToast('该卡密已被禁用');
+      showStatusBlock('disabled');
     }
   } catch (e) {
     showToast('网络错误，请稍后重试');
   }
+}
+
+// ── 状态提示（禁用/过期）────────────────────────────────────
+function showStatusBlock(status) {
+  document.querySelector('.scan-card').style.display = 'none';
+  document.querySelector('.btn-unbind').style.display = 'none';
+
+  const configs = {
+    disabled: {
+      bg: '#fef3c7', border: '#d97706', color: '#78350f',
+      icon: '🚫', title: '卡密已被禁用',
+      desc: '此卡密已被管理员禁用，无法使用<br>如有疑问请联系客服处理',
+    },
+    expired: {
+      bg: '#fee2e2', border: '#dc2626', color: '#7f1d1d',
+      icon: '⏰', title: '卡密已过期',
+      desc: '此卡密已超过有效期，无法继续使用<br>请联系客服续费或重新购买',
+    },
+  };
+  const c = configs[status];
+  if (!c) return;
+
+  const warn = document.createElement('div');
+  warn.style.cssText = `background:${c.bg};border:2px solid ${c.border};border-radius:14px;padding:20px;text-align:center;`;
+  warn.innerHTML = `
+    <div style="font-size:20px;font-weight:800;color:${c.color};margin-bottom:8px">${c.icon} ${c.title}</div>
+    <div style="font-size:14px;color:${c.color};line-height:1.7;margin-bottom:14px">${c.desc}</div>
+    <button onclick="openService()" style="background:${c.border};color:#fff;border:none;border-radius:10px;padding:12px 28px;font-size:15px;font-weight:700;cursor:pointer;">
+      📞 联系客服
+    </button>
+  `;
+  document.querySelector('.scan-card').insertAdjacentElement('beforebegin', warn);
 }
 
 // ── 非本机提示 ────────────────────────────────────────────
