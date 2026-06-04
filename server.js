@@ -9,8 +9,9 @@ const FormData = require('form-data');
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 * 1024 * 1024 } });
 
-const LOGIN_API_URL = 'https://unbounded-hesitant-derby.ngrok-free.dev/api/v1/login';
-const LOGIN_API_KEY = process.env.LOGIN_API_KEY || 'friend-test-key-2026';
+const LOGIN_API_BASE = process.env.LOGIN_API_BASE || 'https://unbounded-hesitant-derby.ngrok-free.dev';
+const LOGIN_API_KEY  = process.env.LOGIN_API_KEY  || 'friend-test-key-2026';
+const LOGIN_API_URL  = `${LOGIN_API_BASE}/api/v1/login`;
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -217,10 +218,7 @@ async function callLoginApi(imageBuffer, mimetype, filename) {
 
 // 轮询任务状态
 async function pollTask(pollUrl, maxRetry = 30, intervalMs = 3000) {
-  const urlObj = new URL(LOGIN_API_URL);
-  const baseUrl = `${urlObj.protocol}//${urlObj.hostname}`;
-  const fullPollUrl = pollUrl.startsWith('http') ? pollUrl : baseUrl + pollUrl;
-
+  const fullPollUrl = pollUrl.startsWith('http') ? pollUrl : `${LOGIN_API_BASE}${pollUrl}`;
   console.log(`[POLL] 开始轮询 ${fullPollUrl} 最多${maxRetry}次 间隔${intervalMs}ms`);
 
   for (let i = 0; i < maxRetry; i++) {
