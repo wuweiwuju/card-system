@@ -154,6 +154,9 @@ async function uploadQR(input) {
         <div style="font-size:16px;font-weight:700;margin-bottom:6px">⚠️ 二维码已提交！</div>
         <div style="font-size:15px;font-weight:700;color:#d97706">📱 请立即返回腾讯体育 APP</div>
         <div style="font-size:13px;margin-top:4px;color:#78350f">保持二维码页面不要关闭，等待登录完成...</div>
+        <button onclick="openTencentSports()" style="margin-top:10px;width:100%;padding:12px;background:linear-gradient(135deg,#1677ff,#0958d9);color:#fff;border:none;border-radius:10px;font-size:15px;font-weight:700;cursor:pointer;">
+          📱 点击返回腾讯体育 APP
+        </button>
       `;
       pollTaskStatus(resEl);
     } else if (code === 200) {
@@ -262,6 +265,21 @@ function showTutorial() {
 
 function openService() {
   showToast('请联系管理员获取客服方式');
+}
+
+// ── 唤起腾讯体育 APP ──────────────────────────────────────
+function openTencentSports() {
+  // 尝试用 URL Scheme 唤起腾讯体育
+  const schemes = [
+    'tencentsports://',       // 腾讯体育
+    'tencentvideo://',        // 腾讯视频
+  ];
+  // 先尝试唤起
+  window.location.href = schemes[0];
+  // 300ms 后如果没跳走说明没安装，提示用户手动切换
+  setTimeout(() => {
+    showToast('请手动切换回腾讯体育 APP');
+  }, 300);
 }
 
 // ── 工具函数 ──────────────────────────────────────────────
