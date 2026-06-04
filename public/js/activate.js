@@ -34,6 +34,12 @@ async function loadCardInfo() {
       devEl.innerHTML = `<span class="badge badge-warn">⚠ 未绑定</span>`;
     }
 
+    // 非本机访问 → 锁定页面
+    if (data.boundDevice && data.isOwner === false) {
+      showBoundWarning(data.boundDevice);
+      return;
+    }
+
     // 激活面板
     if (data.status === 'unused') {
       document.getElementById('activate-panel').style.display = 'block';
@@ -49,6 +55,28 @@ async function loadCardInfo() {
   } catch (e) {
     showToast('网络错误，请稍后重试');
   }
+}
+
+// ── 非本机提示 ────────────────────────────────────────────
+function showBoundWarning(boundIp) {
+  // 隐藏扫码区、解绑按钮
+  document.querySelector('.scan-card').style.display = 'none';
+  document.querySelector('.btn-unbind').style.display = 'none';
+
+  // 在扫码区前插入警告
+  const warn = document.createElement('div');
+  warn.style.cssText = 'background:#fee2e2;border:2px solid #dc2626;border-radius:14px;padding:20px;text-align:center;';
+  warn.innerHTML = `
+    <div style="font-size:20px;font-weight:800;color:#991b1b;margin-bottom:8px">⛔ 设备不匹配</div>
+    <div style="font-size:14px;color:#7f1d1d;line-height:1.7;margin-bottom:14px">
+      此卡密已绑定其他设备（${boundIp}）<br>
+      当前设备无法使用，请联系客服解绑后再访问
+    </div>
+    <button onclick="openService()" style="background:#dc2626;color:#fff;border:none;border-radius:10px;padding:12px 28px;font-size:15px;font-weight:700;cursor:pointer;">
+      📞 联系客服解绑
+    </button>
+  `;
+  document.querySelector('.scan-card').insertAdjacentElement('beforebegin', warn);
 }
 
 // ── 激活 ──────────────────────────────────────────────────

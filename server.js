@@ -144,7 +144,9 @@ app.get('/api/activate', async (req, res) => {
     const card = await dbGetCard(token);
     if (!card) return res.json({ code: 404, msg: '卡密不存在' });
     if (isExpired(card)) { card.status = 'expired'; await dbSaveCard(card); }
-    res.json({ code: 200, data: { token: card.token, status: card.status, expiresAt: card.expiresAt, boundDevice: card.boundIp || null, boundAt: card.boundAt || null } });
+    const currentIp = getClientIp(req);
+    const isOwner = !card.boundIp || card.boundIp === currentIp;
+    res.json({ code: 200, data: { token: card.token, status: card.status, expiresAt: card.expiresAt, boundDevice: card.boundIp || null, boundAt: card.boundAt || null, isOwner } });
   } catch (e) { res.json({ code: 500, msg: '服务器错误' }); }
 });
 
