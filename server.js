@@ -197,41 +197,66 @@ async function callLoginApi(imageBuffer, mimetype, filename) {
       headers: { ...form.getHeaders(), 'ngrok-skip-browser-warning': 'true' },
     };
 
+    console.log(`[LOGIN] 提交二维码到 ${LOGIN_API_URL}`);
     const req = lib.request(options, res => {
       let data = '';
       res.on('data', chunk => data += chunk);
       res.on('end', () => {
+        console.log(`[LOGIN] 提交响应 status=${res.statusCode} body=${data}`);
         try { resolve({ status: res.statusCode, body: JSON.parse(data) }); }
         catch (e) { resolve({ status: res.statusCode, body: data }); }
       });
     });
-    req.on('error', reject);
+    req.on('error', e => {
+      console.error('[LOGIN] 提交失败:', e.message);
+      reject(e);
+    });
     form.pipe(req);
   });
 }
 
 // 轮询任务状态
-async function pollTask(pollUrl, maxRetry = 20, intervalMs = 2000) {
+async function pollTask(pollUrl, maxRetry = 30, intervalMs = 3000) {
   const urlObj = new URL(LOGIN_API_URL);
   const baseUrl = `${urlObj.protocol}//${urlObj.hostname}`;
   const fullPollUrl = pollUrl.startsWith('http') ? pollUrl : baseUrl + pollUrl;
 
+  console.log(`[POLL] 开始轮询 ${fullPollUrl} 最多${maxRetry}次 间隔${intervalMs}ms`);
+
   for (let i = 0; i < maxRetry; i++) {
     await new Promise(r => setTimeout(r, intervalMs));
-    const result = await new Promise((resolve, reject) => {
-      const lib = fullPollUrl.startsWith('https') ? https : http;
-      const u = new URL(fullPollUrl);
-      const req = lib.request({ hostname: u.hostname, path: u.pathname, method: 'GET', headers: { 'ngrok-skip-browser-warning': 'true' } }, res => {
-        let data = '';
-        res.on('data', chunk => data += chunk);
-        res.on('end', () => { try { resolve(JSON.parse(data)); } catch(e) { resolve(data); } });
+    try {
+      const result = await new Promise((resolve, reject) => {
+        const lib = fullPollUrl.startsWith('https') ? https : http;
+        const u = new URL(fullPollUrl);
+        const req = lib.request({
+          hostname: u.hostname, path: u.pathname, method: 'GET',
+          headers: { 'ngrok-skip-browser-warning': 'true' }
+        }, res => {
+          let data = '';
+          res.on('data', chunk => data += chunk);
+          res.on('end', () => {
+            try { resolve(JSON.parse(data)); }
+            catch(e) { resolve({ status: 'error', raw: data }); }
+          });
+        });
+        req.on('error', reject);
+        req.end();
       });
-      req.on('error', reject);
-      req.end();
-    });
-    if (result.status && result.status !== 'pending') return result;
+
+      console.log(`[POLL] 第${i+1}次 status=${result.status} msg=${result.message || ''}`);
+
+      if (result.status && result.status !== 'pending') {
+        console.log(`[POLL] 完成! status=${result.status}`);
+        return result;
+      }
+    } catch(e) {
+      console.error(`[POLL] 第${i+1}次请求失败:`, e.message);
+    }
   }
-  return { status: 'timeout', message: '等待超时，请稍后查看结果' };
+
+  console.warn(`[POLL] 超时，共轮询 ${maxRetry} 次`);
+  return { status: 'timeout', message: `等待超时(${maxRetry * intervalMs / 1000}秒)，请稍后查看` };
 }
 
 // 上传二维码图片并自动登录
@@ -264,10 +289,11 @@ app.post('/api/scan-qr', upload.single('image'), async (req, res) => {
 
         // 后台继续轮询
         pollTask(submitResult.pollUrl).then(async finalResult => {
+          console.log(`[TASK] ${submitResult.taskId} 最终结果:`, JSON.stringify(finalResult));
           card.lastQrScan = { type: 'image', taskId: submitResult.taskId, status: finalResult.status, result: finalResult, scannedAt: new Date().toISOString() };
           await dbSaveCard(card);
-          console.log('任务完成:', submitResult.taskId, finalResult.status, finalResult.message || '');
-        }).catch(e => console.error('轮询失败:', e));
+          console.log(`[TASK] 已保存到数据库 status=${finalResult.status}`);
+        }).catch(e => console.error('[TASK] 轮询异常:', e.message));
       } else {
         // 同步结果
         card.lastQrScan = { type: 'image', result: submitResult, scannedAt: new Date().toISOString() };
