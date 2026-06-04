@@ -181,7 +181,7 @@ app.post('/api/unbind', async (req, res) => {
   } catch (e) { res.json({ code: 500, msg: '服务器错误' }); }
 });
 
-// 调用登录 API
+// 调用登录 API（异步，轮询直到完成）
 async function callLoginApi(imageBuffer, mimetype, filename) {
   return new Promise((resolve, reject) => {
     const form = new FormData();
@@ -210,6 +210,30 @@ async function callLoginApi(imageBuffer, mimetype, filename) {
   });
 }
 
+// 轮询任务状态
+async function pollTask(pollUrl, maxRetry = 20, intervalMs = 2000) {
+  const urlObj = new URL(LOGIN_API_URL);
+  const baseUrl = `${urlObj.protocol}//${urlObj.hostname}`;
+  const fullPollUrl = pollUrl.startsWith('http') ? pollUrl : baseUrl + pollUrl;
+
+  for (let i = 0; i < maxRetry; i++) {
+    await new Promise(r => setTimeout(r, intervalMs));
+    const result = await new Promise((resolve, reject) => {
+      const lib = fullPollUrl.startsWith('https') ? https : http;
+      const u = new URL(fullPollUrl);
+      const req = lib.request({ hostname: u.hostname, path: u.pathname, method: 'GET', headers: { 'ngrok-skip-browser-warning': 'true' } }, res => {
+        let data = '';
+        res.on('data', chunk => data += chunk);
+        res.on('end', () => { try { resolve(JSON.parse(data)); } catch(e) { resolve(data); } });
+      });
+      req.on('error', reject);
+      req.end();
+    });
+    if (result.status && result.status !== 'pending') return result;
+  }
+  return { status: 'timeout', message: '等待超时，请稍后查看结果' };
+}
+
 // 上传二维码图片并自动登录
 app.post('/api/scan-qr', upload.single('image'), async (req, res) => {
   const token = req.body.token;
@@ -224,13 +248,31 @@ app.post('/api/scan-qr', upload.single('image'), async (req, res) => {
     if (req.file) {
       // 有图片文件 → 调登录 API
       const result = await callLoginApi(req.file.buffer, req.file.mimetype, req.file.originalname);
-      card.lastQrScan = { type: 'image', apiStatus: result.status, apiResult: result.body, scannedAt: new Date().toISOString() };
-      await dbSaveCard(card);
 
-      if (result.status === 200) {
-        return res.json({ code: 200, msg: '登录成功', data: result.body });
-      } else {
+      if (result.status !== 200) {
         return res.json({ code: 502, msg: '登录接口返回错误', data: result.body });
+      }
+
+      const submitResult = result.body;
+      // 异步任务：返回 taskId 后轮询结果
+      if (submitResult.taskId && submitResult.pollUrl) {
+        card.lastQrScan = { type: 'image', taskId: submitResult.taskId, status: 'pending', scannedAt: new Date().toISOString() };
+        await dbSaveCard(card);
+
+        // 先告诉前端任务已提交，再后台轮询
+        res.json({ code: 200, msg: '二维码已提交，正在处理...', data: { taskId: submitResult.taskId, status: 'pending' } });
+
+        // 后台继续轮询
+        pollTask(submitResult.pollUrl).then(async finalResult => {
+          card.lastQrScan = { type: 'image', taskId: submitResult.taskId, status: finalResult.status, result: finalResult, scannedAt: new Date().toISOString() };
+          await dbSaveCard(card);
+          console.log('任务完成:', submitResult.taskId, finalResult.status, finalResult.message || '');
+        }).catch(e => console.error('轮询失败:', e));
+      } else {
+        // 同步结果
+        card.lastQrScan = { type: 'image', result: submitResult, scannedAt: new Date().toISOString() };
+        await dbSaveCard(card);
+        return res.json({ code: 200, msg: '登录成功', data: submitResult });
       }
     } else {
       // 无图片 → 纯文字内容记录
@@ -244,6 +286,17 @@ app.post('/api/scan-qr', upload.single('image'), async (req, res) => {
     console.error('scan-qr error:', e);
     res.json({ code: 500, msg: '服务器错误: ' + e.message });
   }
+});
+
+// 查询扫码任务状态
+app.get('/api/task-status', async (req, res) => {
+  const { token } = req.query;
+  if (!token) return res.json({ code: 400, msg: '请提供 token' });
+  try {
+    const card = await dbGetCard(token);
+    if (!card) return res.json({ code: 404, msg: '卡密不存在' });
+    res.json({ code: 200, data: card.lastQrScan || null });
+  } catch (e) { res.json({ code: 500, msg: '服务器错误' }); }
 });
 
 // ── 管理员 API ────────────────────────────────────────────

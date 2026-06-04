@@ -128,7 +128,12 @@ async function uploadQR(input) {
   if (!file) return;
   input.value = '';
 
-  showToast('正在上传并登录，请稍候...');
+  const resEl = document.getElementById('qr-result');
+  resEl.style.display = 'block';
+  resEl.style.background = '#f0f9ff';
+  resEl.style.borderColor = '#7dd3fc';
+  resEl.style.color = '#0369a1';
+  resEl.textContent = '⏳ 正在上传二维码，请稍候...';
 
   const formData = new FormData();
   formData.append('token', token);
@@ -138,14 +143,15 @@ async function uploadQR(input) {
     const res = await fetch('/api/scan-qr', { method: 'POST', body: formData });
     const { code, msg, data } = await res.json();
 
-    const resEl = document.getElementById('qr-result');
-    resEl.style.display = 'block';
-
-    if (code === 200) {
+    if (code === 200 && data && data.status === 'pending') {
+      resEl.textContent = '⏳ 二维码已提交，正在处理中...';
+      // 轮询任务结果
+      pollTaskStatus(resEl);
+    } else if (code === 200) {
       resEl.style.background = '#f0fdf4';
       resEl.style.borderColor = '#86efac';
       resEl.style.color = '#166534';
-      resEl.textContent = '✓ ' + msg + (data ? ' — ' + JSON.stringify(data) : '');
+      resEl.textContent = '✓ ' + msg;
     } else {
       resEl.style.background = '#fff5f5';
       resEl.style.borderColor = '#fca5a5';
@@ -154,8 +160,39 @@ async function uploadQR(input) {
     }
     showToast(msg);
   } catch (e) {
+    resEl.textContent = '✗ 上传失败：' + e.message;
     showToast('上传失败：' + e.message);
   }
+}
+
+// 轮询任务状态
+async function pollTaskStatus(resEl, retries = 15) {
+  for (let i = 0; i < retries; i++) {
+    await new Promise(r => setTimeout(r, 2000));
+    try {
+      const res = await fetch(`/api/task-status?token=${encodeURIComponent(token)}`);
+      const { code, data } = await res.json();
+      if (code !== 200 || !data) continue;
+
+      if (data.status === 'success') {
+        resEl.style.background = '#f0fdf4';
+        resEl.style.borderColor = '#86efac';
+        resEl.style.color = '#166534';
+        resEl.textContent = '✓ 登录成功！';
+        showToast('登录成功！');
+        return;
+      } else if (data.status === 'failed') {
+        resEl.style.background = '#fff5f5';
+        resEl.style.borderColor = '#fca5a5';
+        resEl.style.color = '#991b1b';
+        resEl.textContent = '✗ 登录失败：' + (data.result && data.result.message || '未知错误');
+        showToast('登录失败');
+        return;
+      }
+      resEl.textContent = `⏳ 处理中... (${i + 1}/${retries})`;
+    } catch (e) { continue; }
+  }
+  resEl.textContent = '⌛ 处理超时，请稍后刷新页面查看结果';
 }
 
 // ── 处理二维码结果 ────────────────────────────────────────
