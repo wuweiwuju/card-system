@@ -194,7 +194,7 @@ async function callLoginApi(imageBuffer, mimetype, filename) {
       hostname: urlObj.hostname,
       path: urlObj.pathname,
       method: 'POST',
-      headers: form.getHeaders(),
+      headers: { ...form.getHeaders(), 'ngrok-skip-browser-warning': 'true' },
     };
 
     const req = lib.request(options, res => {
