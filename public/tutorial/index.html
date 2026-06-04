@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>使用教程</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      padding: 20px;
+    }
+    .container {
+      background: white;
+      border-radius: 20px;
+      padding: 24px 20px;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+      max-width: 420px;
+      width: 100%;
+      text-align: center;
+    }
+    h1 { color: #333; margin-bottom: 8px; font-size: 22px; }
+    .subtitle { color: #888; font-size: 13px; margin-bottom: 20px; }
+    .btn {
+      display: block;
+      width: 100%;
+      padding: 14px 20px;
+      margin: 10px 0;
+      font-size: 16px;
+      color: white;
+      border: none;
+      border-radius: 12px;
+      cursor: pointer;
+      text-decoration: none;
+      transition: transform .2s, box-shadow .2s;
+      font-weight: 600;
+    }
+    .btn:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(0,0,0,.2); }
+    .btn-purple { background: linear-gradient(135deg, #667eea, #764ba2); }
+    .btn-red    { background: linear-gradient(135deg, #e74c3c, #c0392b); }
+    .btn-cyan   { background: linear-gradient(135deg, #00d2ff, #3a7bd5); }
+    .btn-green  { background: linear-gradient(135deg, #56ab2f, #a8e063); }
+    .btn-orange { background: linear-gradient(135deg, #ff6b6b, #ee5a24); }
+    .divider { border: none; border-top: 1px solid #f0f0f0; margin: 14px 0; }
+    .warning {
+      background: #fff3cd;
+      border: 2px solid #d32f2f;
+      border-radius: 10px;
+      padding: 12px;
+      margin-top: 14px;
+      color: #d32f2f;
+      font-size: 13px;
+      line-height: 1.6;
+      text-align: left;
+      font-weight: bold;
+    }
+    .back-btn {
+      display: inline-block;
+      margin-top: 16px;
+      padding: 10px 22px;
+      font-size: 14px;
+      color: white;
+      background: linear-gradient(135deg, #667eea, #764ba2);
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      text-decoration: none;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>📖 使用教程</h1>
+    <p class="subtitle">请根据你的设备类型选择对应教程</p>
+
+    <a href="phone.html" class="btn btn-purple">📱 手机端教程</a>
+    <a href="computer.html" class="btn btn-cyan">💻 电脑端教程</a>
+    <a href="tv.html" class="btn btn-green">📺 电视端教程</a>
+    <a href="antidrop.html" class="btn btn-orange">🛡️ 防掉线教程</a>
+
+    <div class="warning">
+      ⚠️ <strong>重要提示：</strong>发码之后一定一定一定不要操作返回！！！就在码的界面等就行了，如果返回，一定登不上！！！
+    </div>
+
+    <a href="javascript:window.close()" class="back-btn">← 关闭</a>
+  </div>
+</body>
+</html>

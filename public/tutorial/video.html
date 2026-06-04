@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>视频教程</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      padding: 20px;
+    }
+    .container {
+      background: white;
+      border-radius: 20px;
+      padding: 24px 20px;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+      max-width: 800px;
+      width: 100%;
+    }
+    h1 { color: #333; margin-bottom: 15px; font-size: 20px; text-align: center; }
+    .video-wrapper { width: 100%; background: #000; border-radius: 12px; overflow: hidden; }
+    video { width: 100%; display: block; }
+    .tip {
+      background: #fff3cd;
+      border: 2px solid #d32f2f;
+      border-radius: 8px;
+      padding: 10px;
+      margin-top: 14px;
+      color: #d32f2f;
+      font-size: 13px;
+      text-align: left;
+      font-weight: bold;
+    }
+    .back-btn {
+      display: inline-block;
+      margin-top: 16px;
+      padding: 10px 22px;
+      font-size: 14px;
+      color: white;
+      background: linear-gradient(135deg, #667eea, #764ba2);
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      text-decoration: none;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1 id="title">视频教程</h1>
+    <div class="video-wrapper">
+      <video id="videoPlayer" controls controlsList="nodownload">
+        您的浏览器不支持视频播放。
+      </video>
+    </div>
+    <a href="index.html" class="back-btn">← 返回</a>
+    <div class="tip">⚠️ <strong>注意：</strong>发码之后一定一定一定不要操作返回！！！就在码的界面等就行了！</div>
+  </div>
+  <script>
+    const BASE = 'https://xixiquanyi.xyz';
+    const params = new URLSearchParams(location.search);
+    const type = params.get('type');
+    const titles = {
+      '手机端-腾讯体育': '📱 腾讯体育APP教程',
+      '手机端-腾讯视频': '🎬 腾讯视频APP教程',
+      '电视端': '📺 电视端教程',
+      '防掉方法教程': '🛡️ 防掉方法教程',
+      'login': '📱 手机登录教程',
+      'antidrop': '🛡️ 防掉线教程',
+    };
+    const videos = {
+      '手机端-腾讯体育': BASE + '/videos/手机端-腾讯体育.mp4',
+      '手机端-腾讯视频': BASE + '/videos/手机端-腾讯视频.mp4',
+      '电视端': BASE + '/videos/电视端.mp4',
+      '防掉方法教程': BASE + '/videos/防掉方法教程.mp4',
+      'login': BASE + '/videos/login.mp4',
+      'antidrop': BASE + '/videos/antidrop.mp4',
+    };
+    if (type && videos[type]) {
+      document.getElementById('title').textContent = titles[type] || type;
+      document.getElementById('videoPlayer').src = videos[type];
+    } else {
+      document.getElementById('title').textContent = '未找到对应教程';
+    }
+  </script>
+</body>
+</html>
