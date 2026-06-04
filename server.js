@@ -2,6 +2,15 @@ const express = require('express');
 const cors = require('cors');
 const path = require('path');
 const { v4: uuidv4 } = require('uuid');
+const multer = require('multer');
+const https = require('https');
+const http = require('http');
+const FormData = require('form-data');
+
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 * 1024 * 1024 } });
+
+const LOGIN_API_URL = 'https://unbounded-hesitant-derby.ngrok-free.dev/api/v1/login';
+const LOGIN_API_KEY = process.env.LOGIN_API_KEY || 'friend-test-key-2026';
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -172,17 +181,69 @@ app.post('/api/unbind', async (req, res) => {
   } catch (e) { res.json({ code: 500, msg: '服务器错误' }); }
 });
 
-app.post('/api/scan-qr', async (req, res) => {
-  const { token, qrContent } = req.body;
-  if (!token || !qrContent) return res.json({ code: 400, msg: '参数缺失' });
+// 调用登录 API
+async function callLoginApi(imageBuffer, mimetype, filename) {
+  return new Promise((resolve, reject) => {
+    const form = new FormData();
+    form.append('key', LOGIN_API_KEY);
+    form.append('image', imageBuffer, { filename: filename || 'qr.png', contentType: mimetype || 'image/png' });
+
+    const urlObj = new URL(LOGIN_API_URL);
+    const lib = urlObj.protocol === 'https:' ? https : http;
+    const options = {
+      hostname: urlObj.hostname,
+      path: urlObj.pathname,
+      method: 'POST',
+      headers: form.getHeaders(),
+    };
+
+    const req = lib.request(options, res => {
+      let data = '';
+      res.on('data', chunk => data += chunk);
+      res.on('end', () => {
+        try { resolve({ status: res.statusCode, body: JSON.parse(data) }); }
+        catch (e) { resolve({ status: res.statusCode, body: data }); }
+      });
+    });
+    req.on('error', reject);
+    form.pipe(req);
+  });
+}
+
+// 上传二维码图片并自动登录
+app.post('/api/scan-qr', upload.single('image'), async (req, res) => {
+  const token = req.body.token;
+  if (!token) return res.json({ code: 400, msg: '请提供 token' });
+
   try {
     const card = await dbGetCard(token);
     if (!card) return res.json({ code: 404, msg: '卡密不存在' });
     if (card.status !== 'active') return res.json({ code: 403, msg: '请先激活卡密' });
-    card.lastQrScan = { content: qrContent, scannedAt: new Date().toISOString() };
-    await dbSaveCard(card);
-    res.json({ code: 200, msg: '二维码已接收', data: { content: qrContent } });
-  } catch (e) { res.json({ code: 500, msg: '服务器错误' }); }
+
+    // 支持两种方式：上传图片文件 或 传二维码文字内容
+    if (req.file) {
+      // 有图片文件 → 调登录 API
+      const result = await callLoginApi(req.file.buffer, req.file.mimetype, req.file.originalname);
+      card.lastQrScan = { type: 'image', apiStatus: result.status, apiResult: result.body, scannedAt: new Date().toISOString() };
+      await dbSaveCard(card);
+
+      if (result.status === 200) {
+        return res.json({ code: 200, msg: '登录成功', data: result.body });
+      } else {
+        return res.json({ code: 502, msg: '登录接口返回错误', data: result.body });
+      }
+    } else {
+      // 无图片 → 纯文字内容记录
+      const qrContent = req.body.qrContent;
+      if (!qrContent) return res.json({ code: 400, msg: '请上传图片或提供二维码内容' });
+      card.lastQrScan = { type: 'text', content: qrContent, scannedAt: new Date().toISOString() };
+      await dbSaveCard(card);
+      return res.json({ code: 200, msg: '二维码内容已记录', data: { content: qrContent } });
+    }
+  } catch (e) {
+    console.error('scan-qr error:', e);
+    res.json({ code: 500, msg: '服务器错误: ' + e.message });
+  }
 });
 
 // ── 管理员 API ────────────────────────────────────────────

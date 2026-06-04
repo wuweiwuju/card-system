@@ -128,25 +128,34 @@ async function uploadQR(input) {
   if (!file) return;
   input.value = '';
 
-  const img = new Image();
-  img.onload = async () => {
-    const canvas = document.createElement('canvas');
-    canvas.width = img.width; canvas.height = img.height;
-    canvas.getContext('2d').drawImage(img, 0, 0);
+  showToast('正在上传并登录，请稍候...');
 
-    try {
-      if (typeof ZXing !== 'undefined') {
-        const reader = new ZXing.BrowserQRCodeReader();
-        const result = await reader.decodeFromCanvas(canvas);
-        handleQRResult(result.getText());
-      } else {
-        showToast('ZXing 库加载失败，请刷新重试');
-      }
-    } catch (e) {
-      showToast('未能识别二维码，请确认图片清晰');
+  const formData = new FormData();
+  formData.append('token', token);
+  formData.append('image', file);
+
+  try {
+    const res = await fetch('/api/scan-qr', { method: 'POST', body: formData });
+    const { code, msg, data } = await res.json();
+
+    const resEl = document.getElementById('qr-result');
+    resEl.style.display = 'block';
+
+    if (code === 200) {
+      resEl.style.background = '#f0fdf4';
+      resEl.style.borderColor = '#86efac';
+      resEl.style.color = '#166534';
+      resEl.textContent = '✓ ' + msg + (data ? ' — ' + JSON.stringify(data) : '');
+    } else {
+      resEl.style.background = '#fff5f5';
+      resEl.style.borderColor = '#fca5a5';
+      resEl.style.color = '#991b1b';
+      resEl.textContent = '✗ ' + msg;
     }
-  };
-  img.src = URL.createObjectURL(file);
+    showToast(msg);
+  } catch (e) {
+    showToast('上传失败：' + e.message);
+  }
 }
 
 // ── 处理二维码结果 ────────────────────────────────────────
