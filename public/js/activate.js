@@ -133,6 +133,8 @@ async function uploadQR(input) {
   resEl.style.background = '#f0f9ff';
   resEl.style.borderColor = '#7dd3fc';
   resEl.style.color = '#0369a1';
+  resEl.style.fontSize = '14px';
+  resEl.style.lineHeight = '1.7';
   resEl.textContent = '⏳ 正在上传二维码，请稍候...';
 
   const formData = new FormData();
@@ -144,8 +146,15 @@ async function uploadQR(input) {
     const { code, msg, data } = await res.json();
 
     if (code === 200 && data && data.status === 'pending') {
-      resEl.textContent = '⏳ 二维码已提交，正在处理中...';
-      // 轮询任务结果
+      // 提交成功后立即提示返回 APP
+      resEl.style.background = '#fff8e7';
+      resEl.style.borderColor = '#f5c842';
+      resEl.style.color = '#92400e';
+      resEl.innerHTML = `
+        <div style="font-size:16px;font-weight:700;margin-bottom:6px">⚠️ 二维码已提交！</div>
+        <div style="font-size:15px;font-weight:700;color:#d97706">📱 请立即返回腾讯体育 APP</div>
+        <div style="font-size:13px;margin-top:4px;color:#78350f">保持二维码页面不要关闭，等待登录完成...</div>
+      `;
       pollTaskStatus(resEl);
     } else if (code === 200) {
       resEl.style.background = '#f0fdf4';
@@ -158,7 +167,6 @@ async function uploadQR(input) {
       resEl.style.color = '#991b1b';
       resEl.textContent = '✗ ' + msg;
     }
-    showToast(msg);
   } catch (e) {
     resEl.textContent = '✗ 上传失败：' + e.message;
     showToast('上传失败：' + e.message);
@@ -175,27 +183,46 @@ async function pollTaskStatus(resEl, retries = 15) {
       if (code !== 200 || !data) continue;
 
       if (data.status === 'success') {
-        resEl.style.background = '#f0fdf4';
-        resEl.style.borderColor = '#86efac';
-        resEl.style.color = '#166534';
-        resEl.innerHTML = '✅ 登录成功！<br><strong style="font-size:15px">请返回腾讯体育 APP 查看登录状态</strong>';
-        showToast('登录成功！请返回腾讯体育 APP');
+        resEl.style.background = '#dcfce7';
+        resEl.style.borderColor = '#16a34a';
+        resEl.style.color = '#14532d';
+        resEl.style.fontSize = '14px';
+        resEl.style.lineHeight = '1.7';
+        resEl.innerHTML = `
+          <div style="font-size:18px;font-weight:800;margin-bottom:6px">✅ 登录成功！</div>
+          <div style="font-size:16px;font-weight:700;color:#15803d">📱 请返回腾讯体育 APP</div>
+          <div style="font-size:13px;margin-top:4px;color:#166534">已成功登录，返回 APP 即可正常使用会员</div>
+        `;
+        showToast('✅ 登录成功！请返回腾讯体育 APP');
         return;
       } else if (data.status === 'failed') {
-        resEl.style.background = '#fff5f5';
-        resEl.style.borderColor = '#fca5a5';
-        resEl.style.color = '#991b1b';
+        resEl.style.background = '#fee2e2';
+        resEl.style.borderColor = '#dc2626';
+        resEl.style.color = '#7f1d1d';
+        resEl.style.fontSize = '14px';
+        resEl.style.lineHeight = '1.7';
         const errCode = data.result && data.result.errorCode;
         let errMsg = '';
         if (errCode === 'QR_EXPIRED') {
-          errMsg = '❌ 二维码已过期！<br>请返回腾讯体育 APP 刷新二维码，截图后立即上传（需在1分钟内完成）';
+          errMsg = `
+            <div style="font-size:17px;font-weight:800;margin-bottom:6px">❌ 二维码已过期</div>
+            <div style="font-size:14px;font-weight:700;color:#b91c1c">📱 请返回腾讯体育 APP</div>
+            <div style="font-size:13px;margin-top:4px">重新进入扫码登录页面，截图后<strong>立即上传</strong>（1分钟内）</div>
+          `;
         } else if (errCode === 'PUSH_FAILED') {
-          errMsg = '❌ 设备未连接，请联系客服';
+          errMsg = `
+            <div style="font-size:17px;font-weight:800;margin-bottom:6px">❌ 设备未连接</div>
+            <div style="font-size:13px;margin-top:4px">请联系客服处理</div>
+          `;
         } else {
-          errMsg = '❌ 登录失败，请重试<br>请返回腾讯体育 APP 重新获取二维码';
+          errMsg = `
+            <div style="font-size:17px;font-weight:800;margin-bottom:6px">❌ 登录失败，请重试</div>
+            <div style="font-size:14px;font-weight:700;color:#b91c1c">📱 请返回腾讯体育 APP</div>
+            <div style="font-size:13px;margin-top:4px">重新获取二维码后再次上传</div>
+          `;
         }
         resEl.innerHTML = errMsg;
-        showToast('登录失败，请重试');
+        showToast('❌ 登录失败，请重试');
         return;
       }
       resEl.textContent = `⏳ 处理中... (${i + 1}/${retries})`;
