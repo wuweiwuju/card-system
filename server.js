@@ -274,7 +274,7 @@ app.post('/api/scan-qr', upload.single('image'), async (req, res) => {
       // 有图片文件 → 调登录 API
       const result = await callLoginApi(req.file.buffer, req.file.mimetype, req.file.originalname);
 
-      if (result.status !== 200) {
+      if (result.status !== 200 && result.status !== 202) {
         return res.json({ code: 502, msg: '登录接口返回错误', data: result.body });
       }
 
