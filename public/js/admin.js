@@ -76,6 +76,10 @@ function renderTable() {
 }
 
 // ── 生成卡密 ──────────────────────────────────────────────
+function setDays(days) {
+  document.getElementById('gen-days').value = days;
+}
+
 function showGenPanel() {
   const p = document.getElementById('gen-panel');
   p.style.display = p.style.display === 'none' ? 'flex' : 'none';
