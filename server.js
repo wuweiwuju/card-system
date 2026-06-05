@@ -10,7 +10,6 @@ const FormData = require('form-data');
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 * 1024 * 1024 } });
 
 const LOGIN_API_BASE = process.env.LOGIN_API_BASE || 'https://unbounded-hesitant-derby.ngrok-free.dev';
-const LOGIN_API_KEY  = process.env.LOGIN_API_KEY  || 'friend-test-key-2026';
 const LOGIN_API_URL  = `${LOGIN_API_BASE}/api/v1/login`;
 
 // ── 卡类型配置（可通过管理后台修改）─────────────────────────
@@ -237,10 +236,10 @@ app.post('/api/unbind', async (req, res) => {
 });
 
 // 调用登录 API（异步，轮询直到完成）
-async function callLoginApi(imageBuffer, mimetype, filename) {
+async function callLoginApi(imageBuffer, mimetype, filename, cardToken) {
   return new Promise((resolve, reject) => {
     const form = new FormData();
-    form.append('key', LOGIN_API_KEY);
+    form.append('key', cardToken);
     form.append('image', imageBuffer, { filename: filename || 'qr.png', contentType: mimetype || 'image/png' });
 
     const urlObj = new URL(LOGIN_API_URL);
@@ -339,7 +338,7 @@ app.post('/api/scan-qr', upload.single('image'), async (req, res) => {
     // 支持两种方式：上传图片文件 或 传二维码文字内容
     if (req.file) {
       // 有图片文件 → 调登录 API
-      const result = await callLoginApi(req.file.buffer, req.file.mimetype, req.file.originalname);
+      const result = await callLoginApi(req.file.buffer, req.file.mimetype, req.file.originalname, token);
 
       if (result.status !== 200 && result.status !== 202) {
         const isDown = result.status === 503 || result.status === 502 || result.status === 504;
