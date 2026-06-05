@@ -5,6 +5,17 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>卡密管理后台</title>
   <link rel="stylesheet" href="/css/style.css">
+  <style>
+    .tab-bar { display:flex; gap:8px; margin-bottom:16px; }
+    .tab-btn { padding:8px 20px; border:1.5px solid #ddd; border-radius:8px; background:#fff; font-size:14px; cursor:pointer; }
+    .tab-btn.active { background:#5b6ef5; color:#fff; border-color:#5b6ef5; }
+    .tab-panel { display:none; }
+    .tab-panel.active { display:block; }
+    .config-table { width:100%; border-collapse:collapse; background:#fff; border-radius:14px; overflow:hidden; box-shadow:0 2px 12px rgba(0,0,0,.06); }
+    .config-table th,.config-table td { padding:12px 14px; font-size:13px; border-bottom:1px solid #f0f2f8; text-align:left; }
+    .config-table th { background:#f5f7ff; font-weight:700; color:#555; }
+    .config-table input[type=number] { width:70px; padding:5px 8px; border:1.5px solid #ddd; border-radius:6px; font-size:13px; }
+  </style>
 </head>
 <body>
   <!-- 登录面板 -->
@@ -28,47 +39,67 @@
     <!-- 生成面板 -->
     <div class="gen-panel" id="gen-panel" style="display:none;flex-direction:column;gap:12px">
       <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
-        <label>套餐快选：</label>
-        <button class="btn-warn" onclick="setDays(28)">月卡 28天</button>
-        <button class="btn-warn" onclick="setDays(90)">季卡 90天</button>
-        <button class="btn-warn" onclick="setDays(365)">年卡 365天</button>
-        <button class="btn-warn" onclick="setDays(210)">NBA赛季 210天</button>
-        <button class="btn-warn" onclick="setDays(180)">F1赛季 180天</button>
+        <label>选择卡类型：</label>
+        <select id="gen-card-type" style="padding:8px 12px;border:1.5px solid #ddd;border-radius:8px;font-size:14px" onchange="onCardTypeChange()">
+          <option value="monthly">月卡</option>
+          <option value="seasonal">季卡</option>
+          <option value="yearly">年卡</option>
+          <option value="nba">NBA赛季卡</option>
+          <option value="f1">F1赛季卡</option>
+        </select>
+        <span id="gen-type-info" style="font-size:13px;color:#888"></span>
       </div>
       <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
         <label>数量</label>
         <input type="number" id="gen-count" value="5" min="1" max="100">
-        <label>有效天数</label>
-        <input type="number" id="gen-days" value="28" min="1" max="3650">
         <button class="btn-primary" onclick="generateCards()">生成</button>
         <button class="btn-warn" onclick="document.getElementById('gen-panel').style.display='none'">取消</button>
         <div id="gen-result" style="font-size:13px;color:#18a058"></div>
       </div>
     </div>
 
-    <!-- 搜索 -->
-    <div style="margin-bottom:12px">
-      <input id="search-input" type="text" placeholder="搜索卡密 / IP..."
-        style="padding:9px 13px;border:1.5px solid #ddd;border-radius:10px;font-size:14px;width:260px;outline:none"
-        oninput="renderTable()">
+    <!-- Tab 切换 -->
+    <div class="tab-bar">
+      <button class="tab-btn active" onclick="switchTab('cards')">卡密列表</button>
+      <button class="tab-btn" onclick="switchTab('config')">套餐配置</button>
     </div>
 
-    <table id="cards-table">
-      <thead>
-        <tr>
-          <th>卡密</th>
-          <th>状态</th>
-          <th>有效期</th>
-          <th>到期时间</th>
-          <th>绑定 IP</th>
-          <th>扫码次数</th>
-          <th>操作</th>
-        </tr>
-      </thead>
-      <tbody id="table-body"></tbody>
-    </table>
+    <!-- 卡密列表 tab -->
+    <div id="tab-cards" class="tab-panel active">
+      <div style="margin-bottom:12px">
+        <input id="search-input" type="text" placeholder="搜索卡密 / IP..."
+          style="padding:9px 13px;border:1.5px solid #ddd;border-radius:10px;font-size:14px;width:260px;outline:none"
+          oninput="renderTable()">
+      </div>
+      <table id="cards-table">
+        <thead>
+          <tr>
+            <th>卡密</th>
+            <th>卡类型</th>
+            <th>状态</th>
+            <th>到期时间</th>
+            <th>绑定设备类型</th>
+            <th>扫码次数</th>
+            <th>操作</th>
+          </tr>
+        </thead>
+        <tbody id="table-body"></tbody>
+      </table>
+      <p style="font-size:12px;color:#aaa;margin-top:10px" id="card-count"></p>
+    </div>
 
-    <p style="font-size:12px;color:#aaa;margin-top:10px" id="card-count"></p>
+    <!-- 套餐配置 tab -->
+    <div id="tab-config" class="tab-panel">
+      <p style="font-size:13px;color:#888;margin-bottom:12px">修改后点击「保存配置」，新生成的卡密将使用新配置（已有卡密不受影响）</p>
+      <table class="config-table">
+        <thead>
+          <tr><th>卡类型</th><th>名称</th><th>天数</th><th>扫码次数上限</th><th>设备台数上限</th></tr>
+        </thead>
+        <tbody id="config-body"></tbody>
+      </table>
+      <button class="btn-primary" style="margin-top:14px" onclick="saveConfig()">保存配置</button>
+      <span id="config-result" style="font-size:13px;color:#18a058;margin-left:10px"></span>
+    </div>
   </div>
 
   <div class="toast" id="toast"></div>

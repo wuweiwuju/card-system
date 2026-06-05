@@ -13,6 +13,16 @@ const LOGIN_API_BASE = process.env.LOGIN_API_BASE || 'https://unbounded-hesitant
 const LOGIN_API_KEY  = process.env.LOGIN_API_KEY  || 'friend-test-key-2026';
 const LOGIN_API_URL  = `${LOGIN_API_BASE}/api/v1/login`;
 
+// ── 卡类型配置（可通过管理后台修改）─────────────────────────
+const DEFAULT_CARD_CONFIG = {
+  monthly:  { name: '月卡',    days: 28,  scanLimit: 4,  deviceLimit: 1 },
+  seasonal: { name: '季卡',    days: 90,  scanLimit: 6,  deviceLimit: 2 },
+  yearly:   { name: '年卡',    days: 365, scanLimit: 12, deviceLimit: 2 },
+  nba:      { name: 'NBA赛季卡', days: 210, scanLimit: 6,  deviceLimit: 2 },
+  f1:       { name: 'F1赛季卡',  days: 180, scanLimit: 6,  deviceLimit: 2 },
+};
+let cardConfig = { ...DEFAULT_CARD_CONFIG };
+
 const app = express();
 const PORT = process.env.PORT || 3000;
 const ADMIN_KEY = process.env.ADMIN_KEY || 'admin123456';
@@ -34,18 +44,24 @@ if (DATABASE_URL) {
       created_at TIMESTAMPTZ NOT NULL,
       expires_at TIMESTAMPTZ NOT NULL,
       days INT NOT NULL,
+      card_type TEXT NOT NULL DEFAULT 'monthly',
       bound_ip TEXT,
       bound_device TEXT,
+      bound_device_type TEXT,
       bound_at TIMESTAMPTZ,
       status TEXT NOT NULL DEFAULT 'unused',
       last_qr_scan JSONB,
-      scan_limit INT NOT NULL DEFAULT 5,
-      scan_used INT NOT NULL DEFAULT 0
+      scan_limit INT NOT NULL DEFAULT 4,
+      scan_used INT NOT NULL DEFAULT 0,
+      device_limit INT NOT NULL DEFAULT 1
     )
   `).then(async () => {
     await pool.query(`ALTER TABLE cards ADD COLUMN IF NOT EXISTS bound_device TEXT`).catch(()=>{});
-    await pool.query(`ALTER TABLE cards ADD COLUMN IF NOT EXISTS scan_limit INT NOT NULL DEFAULT 5`).catch(()=>{});
+    await pool.query(`ALTER TABLE cards ADD COLUMN IF NOT EXISTS card_type TEXT NOT NULL DEFAULT 'monthly'`).catch(()=>{});
+    await pool.query(`ALTER TABLE cards ADD COLUMN IF NOT EXISTS bound_device_type TEXT`).catch(()=>{});
+    await pool.query(`ALTER TABLE cards ADD COLUMN IF NOT EXISTS scan_limit INT NOT NULL DEFAULT 4`).catch(()=>{});
     await pool.query(`ALTER TABLE cards ADD COLUMN IF NOT EXISTS scan_used INT NOT NULL DEFAULT 0`).catch(()=>{});
+    await pool.query(`ALTER TABLE cards ADD COLUMN IF NOT EXISTS device_limit INT NOT NULL DEFAULT 1`).catch(()=>{});
     console.log('PostgreSQL 已连接');
   }).catch(e => console.error('DB 初始化失败', e));
 } else {
@@ -82,14 +98,16 @@ async function dbGetCard(token) {
 async function dbSaveCard(card) {
   if (pool) {
     await pool.query(`
-      INSERT INTO cards (token,created_at,expires_at,days,bound_ip,bound_device,bound_at,status,last_qr_scan,scan_limit,scan_used)
-      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
+      INSERT INTO cards (token,created_at,expires_at,days,card_type,bound_ip,bound_device,bound_device_type,bound_at,status,last_qr_scan,scan_limit,scan_used,device_limit)
+      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
       ON CONFLICT (token) DO UPDATE SET
-        expires_at=$3, days=$4, bound_ip=$5, bound_device=$6, bound_at=$7, status=$8, last_qr_scan=$9, scan_limit=$10, scan_used=$11
+        expires_at=$3, days=$4, card_type=$5, bound_ip=$6, bound_device=$7, bound_device_type=$8,
+        bound_at=$9, status=$10, last_qr_scan=$11, scan_limit=$12, scan_used=$13, device_limit=$14
     `, [card.token, card.createdAt, card.expiresAt, card.days,
-        card.boundIp, card.boundDevice, card.boundAt, card.status,
+        card.cardType || 'monthly', card.boundIp, card.boundDevice,
+        card.boundDeviceType, card.boundAt, card.status,
         card.lastQrScan ? JSON.stringify(card.lastQrScan) : null,
-        card.scanLimit ?? 5, card.scanUsed ?? 0]);
+        card.scanLimit ?? 4, card.scanUsed ?? 0, card.deviceLimit ?? 1]);
     return;
   }
   const data = readData();
@@ -119,22 +137,17 @@ function pgRowToCard(row) {
     createdAt: row.created_at,
     expiresAt: row.expires_at,
     days: row.days,
+    cardType: row.card_type || 'monthly',
     boundIp: row.bound_ip,
     boundDevice: row.bound_device,
+    boundDeviceType: row.bound_device_type,
     boundAt: row.bound_at,
     status: row.status,
     lastQrScan: row.last_qr_scan,
-    scanLimit: row.scan_limit ?? 5,
+    scanLimit: row.scan_limit ?? 4,
     scanUsed: row.scan_used ?? 0,
+    deviceLimit: row.device_limit ?? 1,
   };
-}
-
-// 按天数判断默认扫码限制
-function defaultScanLimit(days) {
-  if (days <= 30) return 4;   // 月卡
-  if (days <= 90) return 6;   // 季卡
-  if (days >= 365) return 15; // 年卡
-  return 5;                   // 其他（NBA/F1赛季卡）
 }
 
 // ── 工具函数 ──────────────────────────────────────────────
@@ -170,7 +183,17 @@ app.get('/api/activate', async (req, res) => {
     const deviceMatch = deviceId && card.boundDevice === deviceId;
     const ipMatch = card.boundIp && card.boundIp === currentIp;
     const isOwner = notBound || deviceMatch || ipMatch;
-    res.json({ code: 200, data: { token: card.token, status: card.status, expiresAt: card.expiresAt, boundDevice: card.boundDevice ? '已绑定' : null, boundAt: card.boundAt || null, isOwner, scanUsed: card.scanUsed ?? 0, scanLimit: card.scanLimit ?? 5 } });
+    const cfg = cardConfig[card.cardType] || cardConfig.monthly;
+    res.json({ code: 200, data: {
+      token: card.token, status: card.status, expiresAt: card.expiresAt,
+      boundDevice: card.boundDevice ? '已绑定' : null,
+      boundDeviceType: card.boundDeviceType || null,
+      boundAt: card.boundAt || null, isOwner,
+      scanUsed: card.scanUsed ?? 0, scanLimit: card.scanLimit ?? cfg.scanLimit,
+      cardType: card.cardType || 'monthly',
+      cardTypeName: cfg.name,
+      deviceLimit: card.deviceLimit ?? cfg.deviceLimit,
+    } });
   } catch (e) { res.json({ code: 500, msg: '服务器错误' }); }
 });
 
@@ -292,6 +315,7 @@ async function pollTask(pollUrl, maxRetry = 30, intervalMs = 3000) {
 // 上传二维码图片并自动登录
 app.post('/api/scan-qr', upload.single('image'), async (req, res) => {
   const token = req.body.token;
+  const deviceType = req.body.deviceType || 'phone'; // phone/pc/tv/tablet
   if (!token) return res.json({ code: 400, msg: '请提供 token' });
 
   try {
@@ -301,9 +325,15 @@ app.post('/api/scan-qr', upload.single('image'), async (req, res) => {
 
     // 检查扫码次数限制
     const used = card.scanUsed ?? 0;
-    const limit = card.scanLimit ?? 5;
+    const limit = card.scanLimit ?? 4;
     if (used >= limit) {
       return res.json({ code: 403, msg: `扫码次数已用完（${used}/${limit}），请联系客服增加次数`, data: { scanUsed: used, scanLimit: limit } });
+    }
+
+    // 检查设备类型限制（首次登录成功后锁定端口类型）
+    const deviceTypeMap = { phone: '手机', pc: '电脑', tv: '电视', tablet: '平板' };
+    if (card.boundDeviceType && card.boundDeviceType !== deviceType) {
+      return res.json({ code: 403, msg: `此卡密只能在${deviceTypeMap[card.boundDeviceType] || card.boundDeviceType}端使用，当前设备类型不符`, data: { boundDeviceType: card.boundDeviceType } });
     }
 
     // 支持两种方式：上传图片文件 或 传二维码文字内容
@@ -334,9 +364,11 @@ app.post('/api/scan-qr', upload.single('image'), async (req, res) => {
           console.log(`[TASK] ${submitResult.taskId} 最终结果:`, JSON.stringify(finalResult));
           if (finalResult.status === 'success') {
             card.scanUsed = (card.scanUsed ?? 0) + 1;
-            console.log(`[TASK] 登录成功，扫码次数 ${card.scanUsed}/${card.scanLimit}`);
+            // 首次登录成功时记录设备类型
+            if (!card.boundDeviceType) card.boundDeviceType = deviceType;
+            console.log(`[TASK] 登录成功，设备类型=${deviceType}，扫码次数 ${card.scanUsed}/${card.scanLimit}`);
           }
-          card.lastQrScan = { type: 'image', taskId: submitResult.taskId, status: finalResult.status, result: finalResult, scannedAt: new Date().toISOString() };
+          card.lastQrScan = { type: 'image', taskId: submitResult.taskId, status: finalResult.status, result: finalResult, deviceType, scannedAt: new Date().toISOString() };
           await dbSaveCard(card);
           console.log(`[TASK] 已保存到数据库 status=${finalResult.status}`);
         }).catch(e => console.error('[TASK] 轮询异常:', e.message));
@@ -384,20 +416,43 @@ app.get('/api/admin/cards', adminAuth, async (req, res) => {
 });
 
 app.post('/api/admin/generate', adminAuth, async (req, res) => {
-  const { count = 1, days = 30 } = req.body;
+  const { count = 1, cardType = 'monthly' } = req.body;
   if (count < 1 || count > 100) return res.json({ code: 400, msg: 'count 范围 1-100' });
+  const cfg = cardConfig[cardType];
+  if (!cfg) return res.json({ code: 400, msg: '无效卡类型' });
   try {
     const now = new Date();
     const generated = [];
-    const scanLimit = defaultScanLimit(Number(days));
     for (let i = 0; i < count; i++) {
       const token = generateToken();
-      const card = { token, createdAt: now.toISOString(), expiresAt: new Date(now.getTime() + days * 86400000).toISOString(), days: Number(days), boundIp: null, boundDevice: null, boundAt: null, status: 'unused', lastQrScan: null, scanLimit, scanUsed: 0 };
+      const card = {
+        token, createdAt: now.toISOString(),
+        expiresAt: new Date(now.getTime() + cfg.days * 86400000).toISOString(),
+        days: cfg.days, cardType,
+        boundIp: null, boundDevice: null, boundDeviceType: null, boundAt: null,
+        status: 'unused', lastQrScan: null,
+        scanLimit: cfg.scanLimit, scanUsed: 0, deviceLimit: cfg.deviceLimit
+      };
       await dbSaveCard(card);
       generated.push(token);
     }
-    res.json({ code: 200, msg: `成功生成 ${count} 个卡密（扫码限制 ${scanLimit} 次）`, data: generated });
+    res.json({ code: 200, msg: `成功生成 ${count} 个${cfg.name}（${cfg.days}天，扫码${cfg.scanLimit}次，${cfg.deviceLimit}台设备）`, data: generated });
   } catch (e) { res.json({ code: 500, msg: '服务器错误' }); }
+});
+
+// 获取/更新卡类型配置
+app.get('/api/admin/card-config', adminAuth, (req, res) => {
+  res.json({ code: 200, data: cardConfig });
+});
+
+app.put('/api/admin/card-config', adminAuth, (req, res) => {
+  const updates = req.body;
+  for (const type of Object.keys(updates)) {
+    if (cardConfig[type]) {
+      cardConfig[type] = { ...cardConfig[type], ...updates[type] };
+    }
+  }
+  res.json({ code: 200, msg: '配置已更新', data: cardConfig });
 });
 
 app.patch('/api/admin/cards/:token', adminAuth, async (req, res) => {
@@ -406,13 +461,23 @@ app.patch('/api/admin/cards/:token', adminAuth, async (req, res) => {
   try {
     const card = await dbGetCard(token);
     if (!card) return res.json({ code: 404, msg: '卡密不存在' });
-    if (action === 'disable') card.status = 'disabled';
-    else if (action === 'enable') card.status = card.boundIp ? 'active' : 'unused';
-    else if (action === 'add_scan') {
+    if (action === 'disable') {
+      card.status = 'disabled';
+    } else if (action === 'enable') {
+      card.status = card.boundDevice || card.boundIp ? 'active' : 'unused';
+    } else if (action === 'add_scan') {
       const add = parseInt(req.body.value) || 1;
-      card.scanLimit = (card.scanLimit ?? 5) + add;
+      card.scanLimit = (card.scanLimit ?? 4) + add;
+    } else if (action === 'reset_device') {
+      // 一键恢复：清除绑定信息，恢复为未激活
+      card.boundDevice = null;
+      card.boundDeviceType = null;
+      card.boundIp = null;
+      card.boundAt = null;
+      card.status = 'unused';
+    } else {
+      return res.json({ code: 400, msg: '未知操作' });
     }
-    else return res.json({ code: 400, msg: '未知操作' });
     await dbSaveCard(card);
     res.json({ code: 200, msg: '操作成功' });
   } catch (e) { res.json({ code: 500, msg: '服务器错误' }); }
