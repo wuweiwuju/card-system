@@ -35,11 +35,16 @@ if (DATABASE_URL) {
       expires_at TIMESTAMPTZ NOT NULL,
       days INT NOT NULL,
       bound_ip TEXT,
+      bound_device TEXT,
       bound_at TIMESTAMPTZ,
       status TEXT NOT NULL DEFAULT 'unused',
       last_qr_scan JSONB
     )
-  `).then(() => console.log('PostgreSQL 已连接')).catch(e => console.error('DB 初始化失败', e));
+  `).then(async () => {
+    // 旧表兼容：尝试加 bound_device 列
+    await pool.query(`ALTER TABLE cards ADD COLUMN IF NOT EXISTS bound_device TEXT`).catch(()=>{});
+    console.log('PostgreSQL 已连接');
+  }).catch(e => console.error('DB 初始化失败', e));
 } else {
   console.log('未检测到 DATABASE_URL，使用本地 JSON 存储');
 }
@@ -74,12 +79,13 @@ async function dbGetCard(token) {
 async function dbSaveCard(card) {
   if (pool) {
     await pool.query(`
-      INSERT INTO cards (token,created_at,expires_at,days,bound_ip,bound_at,status,last_qr_scan)
-      VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
+      INSERT INTO cards (token,created_at,expires_at,days,bound_ip,bound_device,bound_at,status,last_qr_scan)
+      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
       ON CONFLICT (token) DO UPDATE SET
-        expires_at=$3, days=$4, bound_ip=$5, bound_at=$6, status=$7, last_qr_scan=$8
+        expires_at=$3, days=$4, bound_ip=$5, bound_device=$6, bound_at=$7, status=$8, last_qr_scan=$9
     `, [card.token, card.createdAt, card.expiresAt, card.days,
-        card.boundIp, card.boundAt, card.status, card.lastQrScan ? JSON.stringify(card.lastQrScan) : null]);
+        card.boundIp, card.boundDevice, card.boundAt, card.status,
+        card.lastQrScan ? JSON.stringify(card.lastQrScan) : null]);
     return;
   }
   const data = readData();
@@ -110,6 +116,7 @@ function pgRowToCard(row) {
     expiresAt: row.expires_at,
     days: row.days,
     boundIp: row.bound_ip,
+    boundDevice: row.bound_device,
     boundAt: row.bound_at,
     status: row.status,
     lastQrScan: row.last_qr_scan,
@@ -138,35 +145,35 @@ function adminAuth(req, res, next) {
 // ── 用户 API ──────────────────────────────────────────────
 
 app.get('/api/activate', async (req, res) => {
-  const { token } = req.query;
+  const { token, deviceId } = req.query;
   if (!token) return res.json({ code: 400, msg: '请提供 token' });
   try {
     const card = await dbGetCard(token);
     if (!card) return res.json({ code: 404, msg: '卡密不存在' });
     if (isExpired(card)) { card.status = 'expired'; await dbSaveCard(card); }
-    const currentIp = getClientIp(req);
-    const isOwner = !card.boundIp || card.boundIp === currentIp;
-    res.json({ code: 200, data: { token: card.token, status: card.status, expiresAt: card.expiresAt, boundDevice: card.boundIp || null, boundAt: card.boundAt || null, isOwner } });
+    const isOwner = !card.boundDevice || !deviceId || card.boundDevice === deviceId;
+    res.json({ code: 200, data: { token: card.token, status: card.status, expiresAt: card.expiresAt, boundDevice: card.boundDevice ? '已绑定' : null, boundAt: card.boundAt || null, isOwner } });
   } catch (e) { res.json({ code: 500, msg: '服务器错误' }); }
 });
 
 app.post('/api/activate', async (req, res) => {
-  const { token } = req.body;
+  const { token, deviceId } = req.body;
   if (!token) return res.json({ code: 400, msg: '请提供 token' });
+  if (!deviceId) return res.json({ code: 400, msg: '请提供 deviceId' });
   try {
     const card = await dbGetCard(token);
     if (!card) return res.json({ code: 404, msg: '卡密不存在' });
     if (isExpired(card)) { card.status = 'expired'; await dbSaveCard(card); }
     if (card.status === 'expired') return res.json({ code: 403, msg: '卡密已过期' });
     if (card.status === 'disabled') return res.json({ code: 403, msg: '卡密已被禁用' });
-    const ip = getClientIp(req);
-    if (card.status === 'active' && card.boundIp && card.boundIp !== ip)
+    if (card.status === 'active' && card.boundDevice && card.boundDevice !== deviceId)
       return res.json({ code: 403, msg: '该卡密已绑定其他设备，请联系客服解绑' });
     card.status = 'active';
-    card.boundIp = ip;
+    card.boundDevice = deviceId;
+    card.boundIp = getClientIp(req);
     card.boundAt = card.boundAt || new Date().toISOString();
     await dbSaveCard(card);
-    res.json({ code: 200, msg: '激活成功', data: { boundIp: ip, expiresAt: card.expiresAt } });
+    res.json({ code: 200, msg: '激活成功', data: { expiresAt: card.expiresAt } });
   } catch (e) { res.json({ code: 500, msg: '服务器错误' }); }
 });
 
@@ -176,6 +183,7 @@ app.post('/api/unbind', async (req, res) => {
   try {
     const card = await dbGetCard(token);
     if (!card) return res.json({ code: 404, msg: '卡密不存在' });
+    card.boundDevice = null;
     card.boundIp = null;
     card.boundAt = null;
     if (card.status === 'active') card.status = 'unused';

@@ -2,6 +2,17 @@ const token = new URLSearchParams(location.search).get('token');
 let codeReader = null;
 let cameraStream = null;
 
+// 获取或生成设备ID（存 localStorage，换网络不变）
+function getDeviceId() {
+  let id = localStorage.getItem('_did');
+  if (!id) {
+    id = 'D' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+    localStorage.setItem('_did', id);
+  }
+  return id;
+}
+const deviceId = getDeviceId();
+
 // ── 初始化 ────────────────────────────────────────────────
 (async function init() {
   if (!token) {
@@ -15,7 +26,7 @@ let cameraStream = null;
 
 async function loadCardInfo() {
   try {
-    const res = await fetch(`/api/activate?token=${encodeURIComponent(token)}`);
+    const res = await fetch(`/api/activate?token=${encodeURIComponent(token)}&deviceId=${encodeURIComponent(deviceId)}`);
     const { code, data, msg } = await res.json();
     if (code !== 200) { showToast(msg || '查询失败'); return; }
 
@@ -118,7 +129,7 @@ async function activateCard() {
     const res = await fetch('/api/activate', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ token })
+      body: JSON.stringify({ token, deviceId })
     });
     const { code, msg } = await res.json();
     showToast(msg);
@@ -138,7 +149,7 @@ async function unbindDevice() {
     const res = await fetch('/api/unbind', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ token })
+      body: JSON.stringify({ token, deviceId })
     });
     const { code, msg } = await res.json();
     showToast(msg);
