@@ -164,24 +164,26 @@ function closeDeviceModal() {
 }
 
 // ── 按钮点击拦截：先弹设备类型确认 ──────────────────────────
-function onScanBtn(type, e) {
-  if (e) e.preventDefault();
-
-  // 服务器已记录设备类型 或 本次会话已选过 → 直接执行
+function onScanBtn(type) {
+  // 服务器已记录设备类型 或 本次已选过 → 直接执行
   const alreadyChosen = (cardInfo && cardInfo.boundDeviceType)
     || localStorage.getItem('_devtype_' + token);
 
   if (alreadyChosen) {
     if (type === 'camera') startCamera();
-    else document.getElementById('qr-file').click();
+    else triggerFileInput();
     return;
   }
 
   // 首次选择设备类型
   showDeviceTypeModal(() => {
     if (type === 'camera') startCamera();
-    else document.getElementById('qr-file').click();
+    else triggerFileInput();
   });
+}
+
+function triggerFileInput() {
+  document.getElementById('qr-file').click();
 }
 
 // ── 状态提示块 ────────────────────────────────────────────
