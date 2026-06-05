@@ -316,13 +316,21 @@ async function doUploadFile(file, qrText) {
   resEl.style.color = '#0369a1';
   resEl.style.fontSize = '14px';
   resEl.style.lineHeight = '1.7';
-  resEl.textContent = '⏳ 正在上传，请稍候...';
+  resEl.textContent = '⏳ 正在处理图片...';
 
   const formData = new FormData();
   formData.append('token', token);
   formData.append('deviceType', selectedDeviceType);
-  if (file) formData.append('image', file);
+
+  if (file) {
+    // 压缩图片再上传，减少传输时间
+    const compressed = await compressImage(file);
+    formData.append('image', compressed, file.name);
+    console.log(`[UPLOAD] 原始: ${(file.size/1024).toFixed(1)}KB → 压缩后: ${(compressed.size/1024).toFixed(1)}KB`);
+  }
   if (qrText) formData.append('qrContent', qrText);
+
+  resEl.textContent = '⏳ 正在上传，请稍候...';
 
   try {
     const res = await fetch('/api/scan-qr', { method: 'POST', body: formData });
@@ -360,7 +368,24 @@ async function doUploadFile(file, qrText) {
   }
 }
 
-// ── 轮询任务状态 ──────────────────────────────────────────
+// ── 图片压缩 ──────────────────────────────────────────────
+function compressImage(file, maxWidth = 800, quality = 0.85) {
+  return new Promise(resolve => {
+    const img = new Image();
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      let w = img.width, h = img.height;
+      if (w > maxWidth) { h = Math.round(h * maxWidth / w); w = maxWidth; }
+      canvas.width = w; canvas.height = h;
+      canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+      canvas.toBlob(blob => resolve(blob || file), 'image/jpeg', quality);
+    };
+    img.onerror = () => resolve(file); // 压缩失败就用原图
+    img.src = URL.createObjectURL(file);
+  });
+}
+
+// ── 轮询任务状态（自适应间隔）────────────────────────────
 async function pollTaskStatus(resEl, retries = 30) {
   const statusText = {
     queued:   '⏳ 排队中，等待设备处理...',
@@ -370,7 +395,9 @@ async function pollTaskStatus(resEl, retries = 30) {
   };
 
   for (let i = 0; i < retries; i++) {
-    await new Promise(r => setTimeout(r, 3000));
+    // 前3次1秒快速检测，之后3秒
+    const interval = i < 3 ? 1000 : 3000;
+    await new Promise(r => setTimeout(r, interval));
     try {
       const res = await fetch(`/api/task-status?token=${encodeURIComponent(token)}`);
       const { code, data } = await res.json();
