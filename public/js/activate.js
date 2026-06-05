@@ -45,6 +45,21 @@ async function loadCardInfo() {
       devEl.innerHTML = `<span class="badge badge-warn">⚠ 未绑定</span>`;
     }
 
+    // 显示剩余扫码次数
+    if (data.scanLimit !== undefined) {
+      const remain = data.scanLimit - data.scanUsed;
+      const scanEl = document.getElementById('scan-remain');
+      if (scanEl) {
+        scanEl.textContent = `剩余 ${remain} 次 / 共 ${data.scanLimit} 次`;
+        scanEl.style.color = remain <= 1 ? '#e05252' : '#18a058';
+      }
+      // 次数用完 → 锁定扫码区
+      if (remain <= 0) {
+        showStatusBlock('scan_limit');
+        return;
+      }
+    }
+
     // 非本机访问 → 锁定页面
     if (data.boundDevice && data.isOwner === false) {
       showBoundWarning(data.boundDevice);
@@ -84,6 +99,11 @@ function showStatusBlock(status) {
       bg: '#fee2e2', border: '#dc2626', color: '#7f1d1d',
       icon: '⏰', title: '卡密已过期',
       desc: '此卡密已超过有效期，无法继续使用<br>请联系客服续费或重新购买',
+    },
+    scan_limit: {
+      bg: '#fef3c7', border: '#f59e0b', color: '#78350f',
+      icon: '🔢', title: '扫码次数已用完',
+      desc: '此卡密的扫码次数已全部使用<br>请联系客服增加次数后继续使用',
     },
   };
   const c = configs[status];

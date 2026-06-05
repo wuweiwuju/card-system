@@ -57,6 +57,8 @@ function renderTable() {
   tbody.innerHTML = filtered.map(c => {
     const exp = c.expiresAt ? new Date(c.expiresAt).toLocaleString('zh-CN') : '—';
     const ip = c.boundIp || '—';
+    const scanInfo = `${c.scanUsed ?? 0}/${c.scanLimit ?? 5}`;
+    const scanColor = (c.scanUsed ?? 0) >= (c.scanLimit ?? 5) ? 'color:#e05252;font-weight:700' : 'color:#18a058';
     const actions = c.status === 'disabled'
       ? `<button class="btn-warn" onclick="toggleCard('${c.token}','enable')">启用</button>`
       : `<button class="btn-warn" onclick="toggleCard('${c.token}','disable')">禁用</button>`;
@@ -66,6 +68,9 @@ function renderTable() {
       <td>${c.days} 天</td>
       <td>${exp}</td>
       <td style="font-size:12px">${ip}</td>
+      <td style="font-size:13px;${scanColor}">${scanInfo}
+        <button class="btn-warn" style="padding:3px 8px;font-size:12px;margin-left:4px" onclick="addScan('${c.token}')">+次数</button>
+      </td>
       <td style="display:flex;gap:6px;flex-wrap:wrap">
         <button class="btn-primary" style="padding:6px 10px;font-size:12px" onclick="copyToken('${c.token}')">复制</button>
         ${actions}
@@ -102,6 +107,22 @@ async function generateCards() {
   } catch (e) {
     showToast('生成失败');
   }
+}
+
+// ── 增加扫码次数 ──────────────────────────────────────────
+async function addScan(token) {
+  const add = prompt('增加几次扫码次数？', '1');
+  if (!add || isNaN(add) || parseInt(add) < 1) return;
+  try {
+    const res = await fetch(`/api/admin/cards/${encodeURIComponent(token)}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', 'X-Admin-Key': adminKey },
+      body: JSON.stringify({ action: 'add_scan', value: parseInt(add) })
+    });
+    const { code, msg } = await res.json();
+    showToast(msg);
+    if (code === 200) await fetchCards();
+  } catch (e) { showToast('操作失败'); }
 }
 
 // ── 禁用 / 启用 ───────────────────────────────────────────
@@ -144,9 +165,9 @@ function copyToken(token) {
 
 // ── 导出 CSV ──────────────────────────────────────────────
 function exportCSV() {
-  const rows = [['卡密', '状态', '有效天数', '到期时间', '绑定IP', '绑定时间', '创建时间']];
+  const rows = [['卡密', '状态', '有效天数', '到期时间', '绑定IP', '扫码已用', '扫码上限', '绑定时间', '创建时间']];
   allCards.forEach(c => {
-    rows.push([c.token, c.status, c.days, c.expiresAt || '', c.boundIp || '', c.boundAt || '', c.createdAt || '']);
+    rows.push([c.token, c.status, c.days, c.expiresAt || '', c.boundIp || '', c.scanUsed ?? 0, c.scanLimit ?? 5, c.boundAt || '', c.createdAt || '']);
   });
   const csv = rows.map(r => r.map(v => `"${v}"`).join(',')).join('\n');
   const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' });
