@@ -1,9 +1,10 @@
 const token = new URLSearchParams(location.search).get('token');
 let codeReader = null;
 let cameraStream = null;
-let selectedDeviceType = localStorage.getItem('_devtype') || 'phone';
-let cardInfo = null; // 缓存卡密信息，供弹窗使用
-let pendingAction = null; // 用户确认设备类型后执行的回调
+// 优先用本 token 上次选的设备类型，其次全局缓存
+let selectedDeviceType = localStorage.getItem('_devtype_' + token) || localStorage.getItem('_devtype') || 'phone';
+let cardInfo = null;
+let pendingAction = null;
 
 // 获取或生成设备ID（存 localStorage，换网络不变）
 function getDeviceId() {
@@ -151,6 +152,7 @@ function showDeviceTypeModal(callback) {
 function selectDeviceType(type) {
   selectedDeviceType = type;
   localStorage.setItem('_devtype', type);
+  localStorage.setItem('_devtype_' + token, type); // 也存 token 级别，下次不再弹
   document.querySelectorAll('.device-type-btn').forEach(b => b.classList.remove('selected'));
   event.target.classList.add('selected');
   closeDeviceModal();
@@ -165,14 +167,17 @@ function closeDeviceModal() {
 function onScanBtn(type, e) {
   if (e) e.preventDefault();
 
-  // 如果已有绑定设备类型，直接执行，无需再选
-  if (cardInfo && cardInfo.boundDeviceType) {
+  // 服务器已记录设备类型 或 本次会话已选过 → 直接执行
+  const alreadyChosen = (cardInfo && cardInfo.boundDeviceType)
+    || localStorage.getItem('_devtype_' + token);
+
+  if (alreadyChosen) {
     if (type === 'camera') startCamera();
     else document.getElementById('qr-file').click();
     return;
   }
 
-  // 弹设备类型选择
+  // 首次选择设备类型
   showDeviceTypeModal(() => {
     if (type === 'camera') startCamera();
     else document.getElementById('qr-file').click();
