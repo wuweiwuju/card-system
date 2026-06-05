@@ -330,10 +330,18 @@ async function doUploadFile(file, qrText) {
   }
   if (qrText) formData.append('qrContent', qrText);
 
-  resEl.textContent = '⏳ 正在上传，请稍候...';
+  resEl.textContent = '⏳ 正在上传，请稍候（约30秒）...';
+
+  const startTime = Date.now();
+  // 每秒更新等待时间，让用户知道在处理中
+  const waitTimer = setInterval(() => {
+    const sec = Math.round((Date.now() - startTime) / 1000);
+    resEl.textContent = `⏳ 正在处理中... ${sec}秒`;
+  }, 1000);
 
   try {
     const res = await fetch('/api/scan-qr', { method: 'POST', body: formData });
+    clearInterval(waitTimer); // 收到响应立即停止计时
     const { code, msg, data } = await res.json();
 
     if (code === 200 && data && data.status === 'pending') {
@@ -364,6 +372,7 @@ async function doUploadFile(file, qrText) {
       `;
     }
   } catch (e) {
+    clearInterval(waitTimer);
     resEl.textContent = '✗ 上传失败：' + e.message;
   }
 }
