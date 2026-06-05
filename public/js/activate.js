@@ -408,6 +408,7 @@ async function pollTaskStatus(resEl, retries = 30) {
         }
         resEl.innerHTML = errMsg;
         showToast('❌ 登录失败，请重试');
+        await loadCardInfo(); // 刷新次数，确认失败不消耗次数
         return;
       }
 
