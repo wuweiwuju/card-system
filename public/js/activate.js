@@ -243,9 +243,16 @@ async function uploadQR(input) {
 }
 
 // 轮询任务状态
-async function pollTaskStatus(resEl, retries = 15) {
+async function pollTaskStatus(resEl, retries = 30) {
+  const statusText = {
+    queued:   '⏳ 排队中，等待设备处理...',
+    assigned: '📱 已分配设备，准备扫码...',
+    running:  '🔄 正在执行扫码登录，请勿关闭...',
+    pending:  '⏳ 正在处理中...',
+  };
+
   for (let i = 0; i < retries; i++) {
-    await new Promise(r => setTimeout(r, 2000));
+    await new Promise(r => setTimeout(r, 3000));
     try {
       const res = await fetch(`/api/task-status?token=${encodeURIComponent(token)}`);
       const { code, data } = await res.json();
@@ -294,7 +301,13 @@ async function pollTaskStatus(resEl, retries = 15) {
         showToast('❌ 登录失败，请重试');
         return;
       }
-      resEl.textContent = `⏳ 处理中... (${i + 1}/${retries})`;
+
+      // 中间状态：更新提示文字，保持黄色框不变
+      const hint = statusText[data.status] || `⏳ 处理中...`;
+      resEl.querySelector
+        ? (resEl.querySelector('div:last-child') || resEl).textContent = hint
+        : null;
+
     } catch (e) { continue; }
   }
   resEl.textContent = '⌛ 处理超时，请稍后刷新页面查看结果';

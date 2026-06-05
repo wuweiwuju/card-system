@@ -246,7 +246,7 @@ async function pollTask(pollUrl, maxRetry = 30, intervalMs = 3000) {
 
       console.log(`[POLL] 第${i+1}次 status=${result.status} msg=${result.message || ''}`);
 
-      const doneStatuses = ['success', 'failed', 'error', 'cancelled'];
+      const doneStatuses = ['success', 'failed', 'error', 'cancelled', 'timeout'];
       if (result.status && doneStatuses.includes(result.status)) {
         console.log(`[POLL] 完成! status=${result.status}`);
         return result;
