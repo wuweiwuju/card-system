@@ -151,7 +151,11 @@ app.get('/api/activate', async (req, res) => {
     const card = await dbGetCard(token);
     if (!card) return res.json({ code: 404, msg: '卡密不存在' });
     if (isExpired(card)) { card.status = 'expired'; await dbSaveCard(card); }
-    const isOwner = !card.boundDevice || !deviceId || card.boundDevice === deviceId;
+    const currentIp = getClientIp(req);
+    const notBound = !card.boundDevice && !card.boundIp;
+    const deviceMatch = deviceId && card.boundDevice === deviceId;
+    const ipMatch = card.boundIp && card.boundIp === currentIp;
+    const isOwner = notBound || deviceMatch || ipMatch;
     res.json({ code: 200, data: { token: card.token, status: card.status, expiresAt: card.expiresAt, boundDevice: card.boundDevice ? '已绑定' : null, boundAt: card.boundAt || null, isOwner } });
   } catch (e) { res.json({ code: 500, msg: '服务器错误' }); }
 });
@@ -166,11 +170,14 @@ app.post('/api/activate', async (req, res) => {
     if (isExpired(card)) { card.status = 'expired'; await dbSaveCard(card); }
     if (card.status === 'expired') return res.json({ code: 403, msg: '卡密已过期' });
     if (card.status === 'disabled') return res.json({ code: 403, msg: '卡密已被禁用' });
-    if (card.status === 'active' && card.boundDevice && card.boundDevice !== deviceId)
+    const currentIp = getClientIp(req);
+    const deviceMatch = deviceId && card.boundDevice === deviceId;
+    const ipMatch = card.boundIp && card.boundIp === currentIp;
+    if (card.status === 'active' && (card.boundDevice || card.boundIp) && !deviceMatch && !ipMatch)
       return res.json({ code: 403, msg: '该卡密已绑定其他设备，请联系客服解绑' });
     card.status = 'active';
-    card.boundDevice = deviceId;
-    card.boundIp = getClientIp(req);
+    if (deviceId) card.boundDevice = deviceId;
+    card.boundIp = currentIp;
     card.boundAt = card.boundAt || new Date().toISOString();
     await dbSaveCard(card);
     res.json({ code: 200, msg: '激活成功', data: { expiresAt: card.expiresAt } });
