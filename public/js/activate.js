@@ -194,8 +194,8 @@ function showStatusBlock(status) {
   const configs = {
     disabled: {
       bg: '#fef3c7', border: '#d97706', color: '#78350f',
-      icon: '🚫', title: '卡密已被禁用',
-      desc: '此卡密已被管理员禁用，无法使用<br>如有疑问请联系客服处理',
+      icon: '🚫', title: '你的卡密已被禁用',
+      desc: '你的卡密已被禁用，请联系客服~',
     },
     expired: {
       bg: '#fee2e2', border: '#dc2626', color: '#7f1d1d',
