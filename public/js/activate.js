@@ -24,7 +24,8 @@ const deviceId = getDeviceId();
     document.getElementById('display-token').textContent = '卡密：无效';
     return;
   }
-  document.getElementById('display-token').textContent = '卡密：' + token;
+  const tokenEl = document.getElementById('display-token');
+  if (tokenEl) tokenEl.textContent = token;
   await loadCardInfo();
 })();
 
@@ -35,16 +36,21 @@ async function loadCardInfo() {
     if (code !== 200) { showToast(msg || '查询失败'); return; }
     cardInfo = data;
 
-    // 到期时间
+    // 到期时间（banner 里字段较小，只显示日期）
     const expiresEl = document.getElementById('expires-at');
     if (data.expiresAt) {
       const d = new Date(data.expiresAt);
-      expiresEl.textContent = `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+      expiresEl.textContent = `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+      expiresEl.title = `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
     }
 
     // 卡类型
     const typeEl = document.getElementById('card-type-name');
-    if (typeEl && data.cardTypeName) typeEl.textContent = data.cardTypeName;
+    if (typeEl && data.cardTypeName) {
+      typeEl.textContent = `${data.cardTypeName} · ${data.deviceLimit || 1}台设备`;
+      const bar = document.getElementById('card-type-bar');
+      if (bar) bar.style.display = 'flex';
+    }
 
     // 更新提示文字
     const tipEl = document.getElementById('tip-device-rule');
@@ -55,11 +61,13 @@ async function loadCardInfo() {
     // 绑定设备
     const devEl = document.getElementById('bound-device');
     if (data.boundDevice) {
-      const devTypeMap = { phone:'📱手机', pc:'💻电脑', tv:'📺电视', tablet:'📟平板' };
-      const devTypeLabel = data.boundDeviceType ? (devTypeMap[data.boundDeviceType] || '') : '';
-      devEl.innerHTML = `<span class="badge badge-ok">✓ 已绑定</span>${devTypeLabel ? `<small style="color:#888;font-size:11px;margin-top:4px;display:block">${devTypeLabel}</small>` : ''}`;
+      const devTypeMap = { phone:'📱', pc:'💻', tv:'📺', tablet:'📟' };
+      const icon = data.boundDeviceType ? (devTypeMap[data.boundDeviceType] || '✓') : '✓';
+      devEl.textContent = `${icon} 已绑定`;
+      devEl.style.color = '#86efac';
     } else {
-      devEl.innerHTML = `<span class="badge badge-warn">⚠ 未绑定</span>`;
+      devEl.textContent = '未绑定';
+      devEl.style.color = 'rgba(255,255,255,.7)';
     }
 
     // 扫码次数
@@ -67,8 +75,8 @@ async function loadCardInfo() {
       const remain = data.scanLimit - data.scanUsed;
       const scanEl = document.getElementById('scan-remain');
       if (scanEl) {
-        scanEl.textContent = `扫码剩余 ${remain} / ${data.scanLimit} 次`;
-        scanEl.style.color = remain <= 1 ? '#e05252' : '#18a058';
+        scanEl.textContent = `${remain} / ${data.scanLimit}`;
+        scanEl.style.color = remain <= 1 ? '#fca5a5' : '#86efac';
       }
       if (remain <= 0) { showStatusBlock('scan_limit'); return; }
     }
@@ -468,6 +476,18 @@ function openTencentSports() {
 
 function openService() {
   showToast('请联系管理员获取客服方式');
+}
+
+function copyToken() {
+  if (!token) return;
+  navigator.clipboard.writeText(token).then(() => showToast('卡密已复制'));
+}
+
+function toggleTips() {
+  const body = document.getElementById('tips-body');
+  const toggle = document.getElementById('tips-toggle');
+  body.classList.toggle('open');
+  toggle.classList.toggle('open');
 }
 
 // ── 工具函数 ──────────────────────────────────────────────
