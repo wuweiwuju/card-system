@@ -78,13 +78,26 @@ async function fetchConfig() {
 }
 
 // ── 卡密列表 ──────────────────────────────────────────────
+function todayStr() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
+
+function isToday(isoStr) {
+  if (!isoStr) return false;
+  return isoStr.slice(0, 10) === todayStr();
+}
+
 function renderTable() {
   const q = document.getElementById('search-input').value.toLowerCase();
-  const filtered = allCards.filter(c =>
-    c.token.toLowerCase().includes(q) ||
-    (c.boundIp && c.boundIp.includes(q)) ||
-    (c.cardType && c.cardType.includes(q))
-  );
+  const todayOnly = document.getElementById('filter-today')?.checked;
+  const filtered = allCards.filter(c => {
+    const matchQ = c.token.toLowerCase().includes(q) ||
+      (c.boundIp && c.boundIp.includes(q)) ||
+      (c.cardType && c.cardType.includes(q));
+    const matchDay = !todayOnly || isToday(c.createdAt);
+    return matchQ && matchDay;
+  });
 
   document.getElementById('card-count').textContent = `共 ${allCards.length} 个卡密，显示 ${filtered.length} 个`;
 
@@ -98,6 +111,8 @@ function renderTable() {
     const toggleBtn = c.status === 'disabled'
       ? `<button class="btn-warn" onclick="toggleCard('${c.token}','enable')">启用</button>`
       : `<button class="btn-warn" onclick="toggleCard('${c.token}','disable')">禁用</button>`;
+    const createdAt = c.createdAt ? new Date(c.createdAt).toLocaleString('zh-CN') : '—';
+    const todayMark = isToday(c.createdAt) ? ' <span style="background:#dcfce7;color:#16a34a;border-radius:4px;padding:1px 5px;font-size:11px">今日</span>' : '';
     return `<tr>
       <td style="font-family:monospace;font-size:12px">${c.token}</td>
       <td style="font-size:13px">${cardTypeName}</td>
@@ -107,6 +122,7 @@ function renderTable() {
       <td style="font-size:13px;${scanColor}">${scanInfo}
         <button class="btn-warn" style="padding:3px 8px;font-size:12px;margin-left:4px" onclick="addScan('${c.token}')">+次数</button>
       </td>
+      <td style="font-size:12px">${createdAt}${todayMark}</td>
       <td style="display:flex;gap:6px;flex-wrap:wrap">
         <button class="btn-primary" style="padding:6px 10px;font-size:12px" onclick="copyToken('${c.token}')">复制</button>
         ${toggleBtn}
@@ -305,9 +321,12 @@ function copyToken(token) {
 }
 
 // ── 导出 CSV ──────────────────────────────────────────────
-function exportCSV() {
+function exportCSV(todayOnlyFlag = false) {
+  const source = todayOnlyFlag ? allCards.filter(c => isToday(c.createdAt)) : allCards;
+  if (!source.length) { showToast(todayOnlyFlag ? '今日暂无卡密' : '暂无卡密'); return; }
+
   const rows = [['卡密', '卡类型', '状态', '到期时间', '绑定IP', '绑定设备类型', '扫码已用', '扫码上限', '设备上限', '绑定时间', '创建时间']];
-  allCards.forEach(c => {
+  source.forEach(c => {
     rows.push([c.token, CARD_TYPE_LABEL[c.cardType] || c.cardType || '', c.status,
       c.expiresAt || '', c.boundIp || '', c.boundDeviceType || '',
       c.scanUsed ?? 0, c.scanLimit ?? 4, c.deviceLimit ?? 1, c.boundAt || '', c.createdAt || '']);
@@ -316,7 +335,8 @@ function exportCSV() {
   const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' });
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
-  a.download = `cards_${new Date().toISOString().slice(0,10)}.csv`;
+  const suffix = todayOnlyFlag ? `today_${todayStr()}` : new Date().toISOString().slice(0,10);
+  a.download = `cards_${suffix}.csv`;
   a.click();
 }
 
