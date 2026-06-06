@@ -111,23 +111,30 @@ function renderTable() {
     const toggleBtn = c.status === 'disabled'
       ? `<button class="btn-warn" onclick="toggleCard('${c.token}','enable')">启用</button>`
       : `<button class="btn-warn" onclick="toggleCard('${c.token}','disable')">禁用</button>`;
-    const createdAt = c.createdAt ? new Date(c.createdAt).toLocaleString('zh-CN') : '—';
-    const todayMark = isToday(c.createdAt) ? ' <span style="background:#dcfce7;color:#16a34a;border-radius:4px;padding:1px 5px;font-size:11px">今日</span>' : '';
+    const createdAt = c.createdAt ? new Date(c.createdAt).toLocaleString('zh-CN', {month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'}) : '—';
+    const todayMark = isToday(c.createdAt) ? '<span style="background:#dcfce7;color:#16a34a;border-radius:4px;padding:1px 5px;font-size:11px;margin-left:4px">今日</span>' : '';
+    const devIcon = devType !== '—' ? devType + ' ' : '';
     return `<tr>
-      <td style="font-family:monospace;font-size:12px">${c.token}</td>
-      <td style="font-size:13px">${cardTypeName}</td>
-      <td>${STATUS_LABEL[c.status] || c.status}</td>
-      <td style="font-size:12px">${exp}</td>
-      <td style="font-size:13px">${devType}</td>
-      <td style="font-size:13px;${scanColor}">${scanInfo}
-        <button class="btn-warn" style="padding:3px 8px;font-size:12px;margin-left:4px" onclick="addScan('${c.token}')">+次数</button>
+      <td>
+        <span style="font-family:monospace;font-size:12px;cursor:pointer" title="点击复制" onclick="copyTokenDirect('${c.token}')">${c.token.slice(0,8)}…${c.token.slice(-4)}</span>
       </td>
-      <td style="font-size:12px">${createdAt}${todayMark}</td>
-      <td style="display:flex;gap:6px;flex-wrap:wrap">
-        <button class="btn-primary" style="padding:6px 10px;font-size:12px" onclick="copyToken('${c.token}')">复制</button>
-        ${toggleBtn}
-        <button class="btn-warn" onclick="resetDevice('${c.token}')">重置设备</button>
-        <button class="btn-danger" onclick="deleteCard('${c.token}')">删除</button>
+      <td>
+        <div style="font-size:13px;font-weight:600;color:#444">${cardTypeName}</div>
+        <div style="margin-top:3px;display:flex;gap:4px;align-items:center">${STATUS_LABEL[c.status] || c.status}${devIcon ? `<span style="font-size:11px;color:#888">${devIcon}</span>` : ''}</div>
+      </td>
+      <td style="font-size:12px;color:#555">${exp}</td>
+      <td>
+        <span style="font-size:13px;font-weight:700;${scanColor}">${scanInfo}</span>
+        <button class="btn-warn" style="padding:2px 7px;font-size:11px;margin-left:4px" onclick="addScan('${c.token}')">+</button>
+      </td>
+      <td style="font-size:12px;color:#888">${createdAt}${todayMark}</td>
+      <td style="text-align:right">
+        <div style="display:flex;gap:5px;justify-content:flex-end;flex-wrap:wrap">
+          <button class="btn-primary" style="padding:5px 10px;font-size:12px" onclick="copyToken('${c.token}')">复制链接</button>
+          ${toggleBtn}
+          <button class="btn-warn" style="padding:5px 8px;font-size:12px" onclick="resetDevice('${c.token}')" title="重置绑定设备">重置</button>
+          <button class="btn-danger" style="padding:5px 8px;font-size:12px" onclick="deleteCard('${c.token}')">删除</button>
+        </div>
       </td>
     </tr>`;
   }).join('');
@@ -318,6 +325,10 @@ async function deleteCard(token) {
 function copyToken(token) {
   const url = `${location.origin}/activate?token=${token}`;
   navigator.clipboard.writeText(url).then(() => showToast('已复制激活链接'));
+}
+
+function copyTokenDirect(token) {
+  navigator.clipboard.writeText(token).then(() => showToast('卡密已复制'));
 }
 
 // ── 导出 CSV ──────────────────────────────────────────────

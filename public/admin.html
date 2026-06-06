@@ -31,10 +31,12 @@
 
     <div class="admin-toolbar">
       <h2>卡密管理后台</h2>
-      <button class="btn-primary" onclick="showGenPanel()">+ 批量生成</button>
-      <button class="btn-primary" style="background:#18a058" onclick="exportCSV()">导出 CSV</button>
-      <button class="btn-primary" style="background:#5b6ef5" onclick="fetchCards()">🔄 刷新</button>
-      <button class="btn-warn" onclick="logout()">退出</button>
+      <div style="display:flex;gap:8px;margin-left:auto;align-items:center">
+        <button class="btn-primary" onclick="showGenPanel()">+ 批量生成</button>
+        <button class="btn-primary" style="background:#18a058" onclick="exportCSV()">导出 CSV</button>
+        <button class="btn-primary" style="background:#5b6ef5;padding:10px 14px" onclick="fetchCards()" title="刷新列表">🔄</button>
+        <button style="background:none;border:1.5px solid #ddd;border-radius:8px;padding:9px 14px;font-size:13px;color:#888;cursor:pointer" onclick="logout()">退出</button>
+      </div>
     </div>
 
     <!-- 生成面板 -->
@@ -82,13 +84,11 @@
         <thead>
           <tr>
             <th>卡密</th>
-            <th>卡类型</th>
-            <th>状态</th>
+            <th>类型 / 状态</th>
             <th>到期时间</th>
-            <th>绑定设备类型</th>
             <th>扫码次数</th>
             <th>创建时间</th>
-            <th>操作</th>
+            <th style="text-align:right">操作</th>
           </tr>
         </thead>
         <tbody id="table-body"></tbody>
