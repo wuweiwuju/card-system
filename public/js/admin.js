@@ -135,12 +135,12 @@ function renderTable(pagination = null) {
       </td>
       <td style="font-size:12px;color:#888">${createdAt}${todayMark}</td>
       <td style="text-align:right">
-        <div style="display:flex;gap:5px;justify-content:flex-end;flex-wrap:wrap">
-          <button class="btn-primary" style="padding:5px 10px;font-size:12px" onclick="copyToken('${c.token}')">复制链接</button>
+        <div style="display:flex;gap:4px;justify-content:flex-end;align-items:center;white-space:nowrap">
+          <button class="btn-primary" style="padding:4px 8px;font-size:11px" onclick="copyToken('${c.token}')">复制</button>
           ${toggleBtn}
-          <button class="btn-warn" style="padding:5px 8px;font-size:12px;background:#e0f2fe;color:#0369a1" onclick="extendCard('${c.token}')">延期</button>
-          <button class="btn-warn" style="padding:5px 8px;font-size:12px" onclick="resetDevice('${c.token}')" title="重置绑定设备">重置</button>
-          <button class="btn-danger" style="padding:5px 8px;font-size:12px" onclick="deleteCard('${c.token}')">删除</button>
+          <button style="padding:4px 8px;font-size:11px;background:#e0f2fe;color:#0369a1;border:none;border-radius:6px;cursor:pointer" onclick="extendCard('${c.token}')">延期</button>
+          <button style="padding:4px 8px;font-size:11px;background:#fff8e7;color:#b45309;border:none;border-radius:6px;cursor:pointer" onclick="resetDevice('${c.token}')">重置</button>
+          <button style="padding:4px 8px;font-size:11px;background:#fee2e2;color:#dc2626;border:none;border-radius:6px;cursor:pointer" onclick="deleteCard('${c.token}')">删除</button>
         </div>
       </td>
     </tr>`;
