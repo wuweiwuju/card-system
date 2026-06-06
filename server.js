@@ -249,6 +249,7 @@ async function callLoginApi(imageBuffer, mimetype, filename, cardToken) {
       path: urlObj.pathname,
       method: 'POST',
       headers: { ...form.getHeaders(), 'ngrok-skip-browser-warning': 'true' },
+      timeout: 60000, // 60秒超时
     };
 
     console.log(`[LOGIN] 提交二维码到 ${LOGIN_API_URL}`);
@@ -260,6 +261,11 @@ async function callLoginApi(imageBuffer, mimetype, filename, cardToken) {
         try { resolve({ status: res.statusCode, body: JSON.parse(data) }); }
         catch (e) { resolve({ status: res.statusCode, body: data }); }
       });
+    });
+    req.on('timeout', () => {
+      req.destroy();
+      console.error('[LOGIN] 提交超时（60s）');
+      reject(new Error('LOGIN_TIMEOUT'));
     });
     req.on('error', e => {
       console.error('[LOGIN] 提交失败:', e.message);
@@ -282,7 +288,8 @@ async function pollTask(pollUrl, maxRetry = 30, intervalMs = 3000) {
         const u = new URL(fullPollUrl);
         const req = lib.request({
           hostname: u.hostname, path: u.pathname, method: 'GET',
-          headers: { 'ngrok-skip-browser-warning': 'true' }
+          headers: { 'ngrok-skip-browser-warning': 'true' },
+          timeout: 10000, // 10秒超时
         }, res => {
           let data = '';
           res.on('data', chunk => data += chunk);
@@ -291,6 +298,7 @@ async function pollTask(pollUrl, maxRetry = 30, intervalMs = 3000) {
             catch(e) { resolve({ status: 'error', raw: data }); }
           });
         });
+        req.on('timeout', () => { req.destroy(); reject(new Error('POLL_TIMEOUT')); });
         req.on('error', reject);
         req.end();
       });
@@ -406,11 +414,31 @@ app.get('/api/task-status', async (req, res) => {
 
 app.get('/api/admin/cards', adminAuth, async (req, res) => {
   try {
-    const list = await dbListCards();
+    const { page = 1, limit = 50, search = '', today = '' } = req.query;
+    const pageNum = Math.max(1, parseInt(page));
+    const limitNum = Math.min(200, Math.max(1, parseInt(limit)));
+
+    let list = await dbListCards();
+    // 过期检查
     for (const card of list) {
       if (isExpired(card)) { card.status = 'expired'; await dbSaveCard(card); }
     }
-    res.json({ code: 200, data: list });
+    // 搜索过滤
+    if (search) {
+      const q = search.toLowerCase();
+      list = list.filter(c => c.token.toLowerCase().includes(q) || (c.boundIp && c.boundIp.includes(q)));
+    }
+    // 今日过滤
+    if (today === '1') {
+      const todayStr = new Date().toISOString().slice(0, 10);
+      list = list.filter(c => c.createdAt && c.createdAt.slice(0, 10) === todayStr);
+    }
+
+    const total = list.length;
+    const pages = Math.ceil(total / limitNum);
+    const data = list.slice((pageNum - 1) * limitNum, pageNum * limitNum);
+
+    res.json({ code: 200, data, pagination: { page: pageNum, limit: limitNum, total, pages } });
   } catch (e) { res.json({ code: 500, msg: '服务器错误' }); }
 });
 
@@ -473,6 +501,13 @@ app.patch('/api/admin/cards/:token', adminAuth, async (req, res) => {
     } else if (action === 'add_scan') {
       const add = parseInt(req.body.value) || 1;
       card.scanLimit = (card.scanLimit ?? 4) + add;
+    } else if (action === 'extend') {
+      // 延期：在当前到期时间基础上加天数
+      const days = parseInt(req.body.value) || 30;
+      const base = new Date(card.expiresAt) > new Date() ? new Date(card.expiresAt) : new Date();
+      card.expiresAt = new Date(base.getTime() + days * 86400000).toISOString();
+      card.days = (card.days || 0) + days;
+      if (card.status === 'expired') card.status = card.boundDevice ? 'active' : 'unused';
     } else if (action === 'reset_device') {
       // 一键恢复：清除绑定信息，恢复为未激活
       card.boundDevice = null;
@@ -509,12 +544,14 @@ async function fetchDeviceApi(path, method = 'GET', body = null) {
       path: urlObj.pathname + (urlObj.search || ''),
       method,
       headers: { 'ngrok-skip-browser-warning': 'true', 'Content-Type': 'application/json' },
+      timeout: 15000, // 15秒超时
     };
     const req = lib.request(opts, res => {
       let data = '';
       res.on('data', c => data += c);
       res.on('end', () => { try { resolve(JSON.parse(data)); } catch(e) { resolve({ raw: data }); } });
     });
+    req.on('timeout', () => { req.destroy(); reject(new Error('DEVICE_API_TIMEOUT')); });
     req.on('error', reject);
     if (body) req.write(JSON.stringify(body));
     req.end();

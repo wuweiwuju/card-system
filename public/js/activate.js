@@ -1,6 +1,7 @@
 const token = new URLSearchParams(location.search).get('token');
 let codeReader = null;
 let cameraStream = null;
+let isUploading = false; // 防重复提交锁
 // 优先用本 token 上次选的设备类型，其次全局缓存
 let selectedDeviceType = localStorage.getItem('_devtype_' + token) || localStorage.getItem('_devtype') || 'phone';
 let cardInfo = null;
@@ -40,8 +41,25 @@ async function loadCardInfo() {
     const expiresEl = document.getElementById('expires-at');
     if (data.expiresAt) {
       const d = new Date(data.expiresAt);
-      expiresEl.textContent = `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+      const now = new Date();
+      const daysLeft = Math.ceil((d - now) / 86400000);
+      let expiresText = `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+      if (daysLeft > 0 && daysLeft <= 7) {
+        expiresText += ` ⚠️还剩${daysLeft}天`;
+        expiresEl.style.color = '#fca5a5';
+      } else if (daysLeft <= 0) {
+        expiresText = '已过期';
+        expiresEl.style.color = '#fca5a5';
+      }
+      expiresEl.textContent = expiresText;
       expiresEl.title = `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+
+      // 7天内临期 → toast 提醒
+      if (daysLeft > 0 && daysLeft <= 3) {
+        showToast(`⚠️ 卡密还剩 ${daysLeft} 天到期，请及时续费`, 5000);
+      } else if (daysLeft > 3 && daysLeft <= 7) {
+        showToast(`提示：卡密将在 ${daysLeft} 天后到期`);
+      }
     }
 
     // 卡类型
@@ -317,6 +335,13 @@ function uploadQR(input) {
 }
 
 async function doUploadFile(file, qrText) {
+  // 防重复提交
+  if (isUploading) { showToast('正在处理中，请勿重复提交'); return; }
+  isUploading = true;
+
+  // 禁用两个按钮
+  document.querySelectorAll('.btn-scan-new').forEach(b => { b.disabled = true; b.style.opacity = '.5'; });
+
   const resEl = document.getElementById('qr-result');
   resEl.style.display = 'block';
   resEl.style.background = '#f0f9ff';
@@ -349,8 +374,12 @@ async function doUploadFile(file, qrText) {
 
   try {
     const res = await fetch('/api/scan-qr', { method: 'POST', body: formData });
-    clearInterval(waitTimer); // 收到响应立即停止计时
+    clearInterval(waitTimer);
+    // 释放锁，但如果是 pending 状态要等轮询结束才真正解锁
     const { code, msg, data } = await res.json();
+
+    if (code !== 200) isUploading = false; // 失败立即解锁
+    document.querySelectorAll('.btn-scan-new').forEach(b => { b.disabled = false; b.style.opacity = '1'; });
 
     if (code === 200 && data && data.status === 'pending') {
       resEl.style.background = '#fff8e7';
@@ -381,6 +410,8 @@ async function doUploadFile(file, qrText) {
     }
   } catch (e) {
     clearInterval(waitTimer);
+    isUploading = false;
+    document.querySelectorAll('.btn-scan-new').forEach(b => { b.disabled = false; b.style.opacity = '1'; });
     resEl.textContent = '✗ 上传失败：' + e.message;
   }
 }
@@ -430,7 +461,8 @@ async function pollTaskStatus(resEl, retries = 30) {
           <div style="font-size:13px;margin-top:4px;color:#166534">已成功登录，返回 APP 即可正常使用会员</div>
         `;
         showToast('✅ 登录成功！请返回腾讯体育 APP');
-        await loadCardInfo(); // 刷新次数显示
+        isUploading = false;
+        await loadCardInfo();
         return;
       }
 
@@ -454,7 +486,8 @@ async function pollTaskStatus(resEl, retries = 30) {
         }
         resEl.innerHTML = errMsg;
         showToast('❌ 登录失败，请重试');
-        await loadCardInfo(); // 刷新次数，确认失败不消耗次数
+        isUploading = false;
+        await loadCardInfo();
         return;
       }
 
@@ -466,6 +499,7 @@ async function pollTaskStatus(resEl, retries = 30) {
     } catch (e) { continue; }
   }
   resEl.textContent = '⌛ 处理超时，请稍后刷新页面查看结果';
+  isUploading = false;
 }
 
 // ── 唤起 APP ──────────────────────────────────────────────

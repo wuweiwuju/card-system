@@ -1,6 +1,8 @@
 let adminKey = '';
 let allCards = [];
 let cardConfigData = {};
+let currentPage = 1;
+const PAGE_SIZE = 50;
 
 const STATUS_LABEL = {
   unused:   '<span class="badge badge-warn">未激活</span>',
@@ -57,14 +59,15 @@ function switchTab(tab) {
 }
 
 // ── 数据 ──────────────────────────────────────────────────
-async function fetchCards() {
+async function fetchCards(page = 1) {
+  currentPage = page;
   try {
-    const res = await fetch('/api/admin/cards', { headers: { 'X-Admin-Key': adminKey } });
-    const { code, data, msg } = await res.json();
-    if (code === 401) { document.getElementById('login-err').textContent = '密码错误'; return false; }
-    if (code !== 200) { showToast(msg); return false; }
-    allCards = data;
-    renderTable();
+    const res = await fetch(`/api/admin/cards?page=${page}&limit=${PAGE_SIZE}`, { headers: { 'X-Admin-Key': adminKey } });
+    const json = await res.json();
+    if (json.code === 401) { document.getElementById('login-err').textContent = '密码错误'; return false; }
+    if (json.code !== 200) { showToast(json.msg); return false; }
+    allCards = json.data;
+    renderTable(json.pagination);
     return true;
   } catch (e) { showToast('网络错误'); return false; }
 }
@@ -88,18 +91,21 @@ function isToday(isoStr) {
   return isoStr.slice(0, 10) === todayStr();
 }
 
-function renderTable() {
+function renderTable(pagination = null) {
   const q = document.getElementById('search-input').value.toLowerCase();
   const todayOnly = document.getElementById('filter-today')?.checked;
   const filtered = allCards.filter(c => {
-    const matchQ = c.token.toLowerCase().includes(q) ||
+    const matchQ = !q || c.token.toLowerCase().includes(q) ||
       (c.boundIp && c.boundIp.includes(q)) ||
       (c.cardType && c.cardType.includes(q));
     const matchDay = !todayOnly || isToday(c.createdAt);
     return matchQ && matchDay;
   });
 
-  document.getElementById('card-count').textContent = `共 ${allCards.length} 个卡密，显示 ${filtered.length} 个`;
+  const total = pagination ? pagination.total : allCards.length;
+  const pages = pagination ? pagination.pages : 1;
+  const page = pagination ? pagination.page : 1;
+  document.getElementById('card-count').textContent = `共 ${total} 个卡密，当前第 ${page}/${pages} 页`;
 
   const tbody = document.getElementById('table-body');
   tbody.innerHTML = filtered.map(c => {
@@ -132,12 +138,38 @@ function renderTable() {
         <div style="display:flex;gap:5px;justify-content:flex-end;flex-wrap:wrap">
           <button class="btn-primary" style="padding:5px 10px;font-size:12px" onclick="copyToken('${c.token}')">复制链接</button>
           ${toggleBtn}
+          <button class="btn-warn" style="padding:5px 8px;font-size:12px;background:#e0f2fe;color:#0369a1" onclick="extendCard('${c.token}')">延期</button>
           <button class="btn-warn" style="padding:5px 8px;font-size:12px" onclick="resetDevice('${c.token}')" title="重置绑定设备">重置</button>
           <button class="btn-danger" style="padding:5px 8px;font-size:12px" onclick="deleteCard('${c.token}')">删除</button>
         </div>
       </td>
     </tr>`;
   }).join('');
+
+  // 分页控件
+  renderPagination(page, pages);
+}
+
+function renderPagination(page, pages) {
+  let el = document.getElementById('pagination');
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'pagination';
+    el.style.cssText = 'display:flex;gap:6px;align-items:center;margin-top:12px;flex-wrap:wrap';
+    document.getElementById('card-count').insertAdjacentElement('afterend', el);
+  }
+  if (pages <= 1) { el.innerHTML = ''; return; }
+  let html = '';
+  if (page > 1) html += `<button class="btn-warn" style="padding:5px 12px" onclick="fetchCards(${page-1})">‹ 上一页</button>`;
+  // 显示页码（最多显示 5 个）
+  const start = Math.max(1, page - 2);
+  const end = Math.min(pages, start + 4);
+  for (let i = start; i <= end; i++) {
+    const active = i === page ? 'background:#5b6ef5;color:#fff' : 'background:#f5f7ff;color:#333';
+    html += `<button style="padding:5px 10px;border:none;border-radius:6px;cursor:pointer;font-size:13px;${active}" onclick="fetchCards(${i})">${i}</button>`;
+  }
+  if (page < pages) html += `<button class="btn-warn" style="padding:5px 12px" onclick="fetchCards(${page+1})">下一页 ›</button>`;
+  el.innerHTML = html;
 }
 
 // ── 套餐配置 ──────────────────────────────────────────────
@@ -258,8 +290,24 @@ async function generateCards() {
     const { code, data, msg } = await res.json();
     if (code !== 200) { showToast(msg); return; }
     document.getElementById('gen-result').textContent = `✓ 已生成 ${data.length} 个`;
-    await fetchCards();
+    await fetchCards(1);
   } catch (e) { showToast('生成失败'); }
+}
+
+// ── 延期 ──────────────────────────────────────────────────
+async function extendCard(token) {
+  const days = prompt('延期天数（在当前到期时间基础上增加）：', '30');
+  if (!days || isNaN(days) || parseInt(days) < 1) return;
+  try {
+    const res = await fetch(`/api/admin/cards/${encodeURIComponent(token)}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', 'X-Admin-Key': adminKey },
+      body: JSON.stringify({ action: 'extend', value: parseInt(days) })
+    });
+    const { code, msg } = await res.json();
+    showToast(code === 200 ? `已延期 ${days} 天` : (msg || '操作失败'));
+    if (code === 200) await fetchCards(currentPage);
+  } catch (e) { showToast('操作失败'); }
 }
 
 // ── 增加扫码次数 ──────────────────────────────────────────
@@ -274,7 +322,7 @@ async function addScan(token) {
     });
     const { code, msg } = await res.json();
     showToast(msg);
-    if (code === 200) await fetchCards();
+    if (code === 200) await fetchCards(currentPage);
   } catch (e) { showToast('操作失败'); }
 }
 
@@ -289,7 +337,7 @@ async function resetDevice(token) {
     });
     const { code, msg } = await res.json();
     showToast(msg);
-    if (code === 200) await fetchCards();
+    if (code === 200) await fetchCards(currentPage);
   } catch (e) { showToast('操作失败'); }
 }
 
@@ -303,7 +351,7 @@ async function toggleCard(token, action) {
     });
     const { code, msg } = await res.json();
     showToast(msg);
-    if (code === 200) await fetchCards();
+    if (code === 200) await fetchCards(currentPage);
   } catch (e) { showToast('操作失败'); }
 }
 
@@ -317,7 +365,7 @@ async function deleteCard(token) {
     });
     const { code, msg } = await res.json();
     showToast(msg);
-    if (code === 200) await fetchCards();
+    if (code === 200) await fetchCards(currentPage);
   } catch (e) { showToast('删除失败'); }
 }
 
