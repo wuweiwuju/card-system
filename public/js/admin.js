@@ -73,7 +73,7 @@ async function fetchConfig() {
   try {
     const res = await fetch('/api/admin/card-config', { headers: { 'X-Admin-Key': adminKey } });
     const { code, data } = await res.json();
-    if (code === 200) { cardConfigData = data; renderConfig(); }
+    if (code === 200) { cardConfigData = data; renderConfig(); renderGenTypeOptions(); }
   } catch (e) {}
 }
 
@@ -123,19 +123,68 @@ function renderConfig() {
   if (!tbody) return;
   tbody.innerHTML = Object.entries(cardConfigData).map(([type, cfg]) => `
     <tr>
-      <td><strong>${type}</strong></td>
-      <td>${cfg.name}</td>
+      <td><strong style="font-family:monospace">${type}</strong></td>
+      <td><input type="text" id="cfg-name-${type}" value="${cfg.name}" style="width:90px;padding:5px 8px;border:1.5px solid #ddd;border-radius:6px;font-size:13px"></td>
       <td><input type="number" id="cfg-days-${type}" value="${cfg.days}" min="1" max="3650"></td>
       <td><input type="number" id="cfg-scan-${type}" value="${cfg.scanLimit}" min="1" max="999"></td>
       <td><input type="number" id="cfg-device-${type}" value="${cfg.deviceLimit}" min="1" max="10"></td>
+      <td><button class="btn-danger" onclick="deleteCardType('${type}')">删除</button></td>
     </tr>
   `).join('');
+}
+
+function deleteCardType(type) {
+  if (!confirm(`确认删除套餐「${cardConfigData[type]?.name || type}」？已生成的卡密不受影响。`)) return;
+  delete cardConfigData[type];
+  renderConfig();
+  // 同步更新生成面板的下拉选项
+  renderGenTypeOptions();
+  showToast('已删除，点击保存配置生效');
+}
+
+function addCardType() {
+  const key    = document.getElementById('new-type-key').value.trim();
+  const name   = document.getElementById('new-type-name').value.trim();
+  const days   = parseInt(document.getElementById('new-type-days').value);
+  const scan   = parseInt(document.getElementById('new-type-scan').value);
+  const device = parseInt(document.getElementById('new-type-device').value);
+  const errEl  = document.getElementById('new-type-err');
+
+  if (!key)              { errEl.textContent = '请填写类型Key'; return; }
+  if (!/^[a-z0-9_]+$/.test(key)) { errEl.textContent = 'Key只能包含小写字母、数字、下划线'; return; }
+  if (!name)             { errEl.textContent = '请填写套餐名称'; return; }
+  if (!days || days < 1) { errEl.textContent = '请填写有效天数'; return; }
+  if (!scan || scan < 1) { errEl.textContent = '请填写扫码次数'; return; }
+  if (!device || device < 1) { errEl.textContent = '请填写设备台数'; return; }
+  if (cardConfigData[key]) { errEl.textContent = `Key「${key}」已存在，请换一个`; return; }
+
+  errEl.textContent = '';
+  cardConfigData[key] = { name, days, scanLimit: scan, deviceLimit: device };
+  renderConfig();
+  renderGenTypeOptions();
+
+  // 清空输入框
+  ['new-type-key','new-type-name','new-type-days','new-type-scan','new-type-device']
+    .forEach(id => document.getElementById(id).value = '');
+
+  showToast(`已添加「${name}」，点击保存配置生效`);
+}
+
+function renderGenTypeOptions() {
+  const sel = document.getElementById('gen-card-type');
+  if (!sel) return;
+  const cur = sel.value;
+  sel.innerHTML = Object.entries(cardConfigData)
+    .map(([k, v]) => `<option value="${k}"${k === cur ? ' selected' : ''}>${v.name}</option>`)
+    .join('');
+  onCardTypeChange();
 }
 
 async function saveConfig() {
   const updates = {};
   for (const type of Object.keys(cardConfigData)) {
     updates[type] = {
+      name: document.getElementById(`cfg-name-${type}`)?.value || cardConfigData[type].name,
       days: parseInt(document.getElementById(`cfg-days-${type}`)?.value) || cardConfigData[type].days,
       scanLimit: parseInt(document.getElementById(`cfg-scan-${type}`)?.value) || cardConfigData[type].scanLimit,
       deviceLimit: parseInt(document.getElementById(`cfg-device-${type}`)?.value) || cardConfigData[type].deviceLimit,

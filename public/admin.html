@@ -119,12 +119,29 @@
       <p style="font-size:13px;color:#888;margin-bottom:12px">修改后点击「保存配置」，新生成的卡密将使用新配置（已有卡密不受影响）</p>
       <table class="config-table">
         <thead>
-          <tr><th>卡类型</th><th>名称</th><th>天数</th><th>扫码次数上限</th><th>设备台数上限</th></tr>
+          <tr><th>类型Key</th><th>名称</th><th>天数</th><th>扫码次数上限</th><th>设备台数上限</th><th>操作</th></tr>
         </thead>
         <tbody id="config-body"></tbody>
       </table>
-      <button class="btn-primary" style="margin-top:14px" onclick="saveConfig()">保存配置</button>
-      <span id="config-result" style="font-size:13px;color:#18a058;margin-left:10px"></span>
+
+      <!-- 新增套餐 -->
+      <div style="margin-top:16px;background:#f5f7ff;border-radius:12px;padding:16px">
+        <div style="font-size:14px;font-weight:700;color:#1a1a2e;margin-bottom:12px">+ 新增套餐</div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+          <input id="new-type-key" type="text" placeholder="类型Key（如: weekly）" style="padding:8px 10px;border:1.5px solid #ddd;border-radius:8px;font-size:13px;width:150px">
+          <input id="new-type-name" type="text" placeholder="名称（如: 周卡）" style="padding:8px 10px;border:1.5px solid #ddd;border-radius:8px;font-size:13px;width:130px">
+          <input id="new-type-days" type="number" placeholder="天数" min="1" style="padding:8px 10px;border:1.5px solid #ddd;border-radius:8px;font-size:13px;width:80px">
+          <input id="new-type-scan" type="number" placeholder="扫码次数" min="1" style="padding:8px 10px;border:1.5px solid #ddd;border-radius:8px;font-size:13px;width:90px">
+          <input id="new-type-device" type="number" placeholder="设备台数" min="1" style="padding:8px 10px;border:1.5px solid #ddd;border-radius:8px;font-size:13px;width:90px">
+          <button class="btn-primary" onclick="addCardType()">新增</button>
+        </div>
+        <p id="new-type-err" style="font-size:12px;color:#e05252;margin-top:6px"></p>
+      </div>
+
+      <div style="margin-top:14px;display:flex;align-items:center;gap:10px">
+        <button class="btn-primary" onclick="saveConfig()">保存配置</button>
+        <span id="config-result" style="font-size:13px;color:#18a058"></span>
+      </div>
     </div>
   </div>
 

@@ -446,10 +446,16 @@ app.get('/api/admin/card-config', adminAuth, (req, res) => {
 
 app.put('/api/admin/card-config', adminAuth, (req, res) => {
   const updates = req.body;
+  // 先清空再重建，支持新增和删除
+  cardConfig = {};
   for (const type of Object.keys(updates)) {
-    if (cardConfig[type]) {
-      cardConfig[type] = { ...cardConfig[type], ...updates[type] };
-    }
+    const u = updates[type];
+    cardConfig[type] = {
+      name: u.name || type,
+      days: Number(u.days) || 30,
+      scanLimit: Number(u.scanLimit) || 4,
+      deviceLimit: Number(u.deviceLimit) || 1,
+    };
   }
   res.json({ code: 200, msg: '配置已更新', data: cardConfig });
 });
