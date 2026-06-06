@@ -492,6 +492,52 @@ app.delete('/api/admin/cards/:token', adminAuth, async (req, res) => {
   } catch (e) { res.json({ code: 500, msg: '服务器错误' }); }
 });
 
+// ── 设备管理 API（转发到自动化服务）──────────────────────────
+
+async function fetchDeviceApi(path, method = 'GET', body = null) {
+  return new Promise((resolve, reject) => {
+    const urlObj = new URL(LOGIN_API_BASE + path);
+    const lib = urlObj.protocol === 'https:' ? https : http;
+    const opts = {
+      hostname: urlObj.hostname,
+      path: urlObj.pathname + (urlObj.search || ''),
+      method,
+      headers: { 'ngrok-skip-browser-warning': 'true', 'Content-Type': 'application/json' },
+    };
+    const req = lib.request(opts, res => {
+      let data = '';
+      res.on('data', c => data += c);
+      res.on('end', () => { try { resolve(JSON.parse(data)); } catch(e) { resolve({ raw: data }); } });
+    });
+    req.on('error', reject);
+    if (body) req.write(JSON.stringify(body));
+    req.end();
+  });
+}
+
+// 获取设备列表
+app.get('/api/admin/devices', adminAuth, async (req, res) => {
+  try {
+    const data = await fetchDeviceApi('/api/v1/devices');
+    res.json({ code: 200, data });
+  } catch (e) {
+    res.json({ code: 502, msg: '获取设备列表失败: ' + e.message });
+  }
+});
+
+// 启用/禁用设备
+app.post('/api/admin/devices/:serial/enable', adminAuth, async (req, res) => {
+  const { serial } = req.params;
+  const { enabled } = req.body;
+  if (enabled === undefined) return res.json({ code: 400, msg: '请提供 enabled 参数' });
+  try {
+    const data = await fetchDeviceApi(`/api/v1/devices/${serial}/enable`, 'POST', { enabled });
+    res.json({ code: 200, data });
+  } catch (e) {
+    res.json({ code: 502, msg: '操作失败: ' + e.message });
+  }
+});
+
 app.get('/activate', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });

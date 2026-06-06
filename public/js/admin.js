@@ -47,12 +47,13 @@ function logout() {
 
 // ── Tab 切换 ──────────────────────────────────────────────
 function switchTab(tab) {
+  const tabs = ['cards', 'config', 'devices'];
   document.querySelectorAll('.tab-btn').forEach((b, i) => {
-    const tabs = ['cards', 'config'];
     b.classList.toggle('active', tabs[i] === tab);
   });
   document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
   document.getElementById('tab-' + tab).classList.add('active');
+  if (tab === 'devices') fetchDevices();
 }
 
 // ── 数据 ──────────────────────────────────────────────────
@@ -268,6 +269,74 @@ function exportCSV() {
   a.href = URL.createObjectURL(blob);
   a.download = `cards_${new Date().toISOString().slice(0,10)}.csv`;
   a.click();
+}
+
+// ── 设备管理 ──────────────────────────────────────────────
+async function fetchDevices() {
+  const tbody = document.getElementById('devices-body');
+  tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:#aaa;padding:24px">加载中...</td></tr>';
+  try {
+    const res = await fetch('/api/admin/devices', { headers: { 'X-Admin-Key': adminKey } });
+    const { code, data, msg } = await res.json();
+    if (code !== 200) { showToast(msg || '获取失败'); return; }
+
+    const d = data.data || data;
+    const stats = document.getElementById('device-stats');
+    if (stats && d.total !== undefined) {
+      stats.innerHTML = `总设备 <strong>${d.total}</strong> 台 &nbsp;|&nbsp; 在线 <strong style="color:#18a058">${d.online}</strong> &nbsp;|&nbsp; 空闲 <strong style="color:#5b6ef5">${d.idle}</strong> &nbsp;|&nbsp; 忙碌 <strong style="color:#e05252">${d.busy}</strong>`;
+    }
+
+    const devices = d.devices || [];
+    if (!devices.length) {
+      tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:#aaa;padding:24px">暂无设备</td></tr>';
+      return;
+    }
+
+    tbody.innerHTML = devices.map(dev => {
+      const statusBadge = dev.status === 'idle'
+        ? '<span class="badge badge-ok">空闲</span>'
+        : '<span class="badge badge-error">忙碌</span>';
+      const onlineBadge = dev.isOnline
+        ? '<span style="color:#18a058">● 在线</span>'
+        : '<span style="color:#aaa">● 离线</span>';
+      const enabledBadge = dev.enabled === false
+        ? '<span class="badge badge-error">已禁用</span>'
+        : '<span class="badge badge-ok">可用</span>';
+      const lastUsed = dev.lastUsed ? new Date(dev.lastUsed).toLocaleString('zh-CN') : '—';
+      const currentTask = dev.currentTaskId
+        ? `<span style="font-size:11px;font-family:monospace">${dev.currentTaskId.slice(0,12)}...</span>`
+        : '—';
+      const toggleBtn = dev.enabled === false
+        ? `<button class="btn-primary" style="padding:5px 10px;font-size:12px" onclick="setDeviceEnabled('${dev.serial}', true)">启用</button>`
+        : `<button class="btn-danger" onclick="setDeviceEnabled('${dev.serial}', false)">禁用</button>`;
+
+      return `<tr>
+        <td style="font-family:monospace;font-size:12px">${dev.serial}<br>${onlineBadge}</td>
+        <td style="font-size:13px">${dev.model || '—'}</td>
+        <td>${statusBadge}<br>${enabledBadge}</td>
+        <td style="font-size:12px">${dev.boundPlatform || '—'}</td>
+        <td style="font-size:12px">${currentTask}</td>
+        <td style="text-align:center">${dev.taskCount ?? 0}</td>
+        <td style="font-size:12px">${lastUsed}</td>
+        <td>${toggleBtn}</td>
+      </tr>`;
+    }).join('');
+  } catch (e) {
+    tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:#e05252;padding:24px">连接设备服务失败，请检查接口是否在线</td></tr>';
+  }
+}
+
+async function setDeviceEnabled(serial, enabled) {
+  try {
+    const res = await fetch(`/api/admin/devices/${encodeURIComponent(serial)}/enable`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Admin-Key': adminKey },
+      body: JSON.stringify({ enabled })
+    });
+    const { code, msg } = await res.json();
+    showToast(code === 200 ? (enabled ? '设备已启用' : '设备已禁用') : (msg || '操作失败'));
+    if (code === 200) fetchDevices();
+  } catch (e) { showToast('操作失败'); }
 }
 
 // ── Toast ──────────────────────────────────────────────────
