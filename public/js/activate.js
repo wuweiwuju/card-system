@@ -128,7 +128,7 @@ function showWelcomeModal(data) {
   document.getElementById('modal-rules').innerHTML = `
     <div class="rule-item"><div class="rule-num">1</div><p>${cfg.rule}</p></div>
     <div class="rule-item"><div class="rule-num">2</div><p>上传二维码后请立即返回 APP，不要做任何操作，等待登录完成</p></div>
-    <div class="rule-item"><div class="rule-num">3</div><p>扫码次数有限制，登录失败也会消耗次数，请确认二维码清晰后再上传</p></div>
+    <div class="rule-item"><div class="rule-num">3</div><p>扫码次数有限制，<strong>只有登录成功才消耗次数</strong>，请确认二维码清晰后再上传</p></div>
   `;
   document.getElementById('modal-welcome').classList.add('show');
 }
