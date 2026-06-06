@@ -349,7 +349,7 @@ async function fetchDevices() {
         ? '<span style="color:#18a058">● 在线</span>'
         : '<span style="color:#aaa">● 离线</span>';
       const enabledBadge = dev.enabled === false
-        ? '<span class="badge badge-error">已禁用</span>'
+        ? `<span class="badge badge-error">已禁用</span>${dev.disabledReason ? `<br><small style="color:#e05252;font-size:11px">${dev.disabledReason}</small>` : ''}`
         : '<span class="badge badge-ok">可用</span>';
       const lastUsed = dev.lastUsed ? new Date(dev.lastUsed).toLocaleString('zh-CN') : '—';
       const currentTask = dev.currentTaskId
@@ -357,7 +357,7 @@ async function fetchDevices() {
         : '—';
       const toggleBtn = dev.enabled === false
         ? `<button class="btn-primary" style="padding:5px 10px;font-size:12px" onclick="setDeviceEnabled('${dev.serial}', true)">启用</button>`
-        : `<button class="btn-danger" onclick="setDeviceEnabled('${dev.serial}', false)">禁用</button>`;
+        : `<button class="btn-danger" onclick="setDeviceEnabledWithReason('${dev.serial}')">禁用</button>`;
 
       return `<tr>
         <td style="font-family:monospace;font-size:12px">${dev.serial}<br>${onlineBadge}</td>
@@ -375,12 +375,20 @@ async function fetchDevices() {
   }
 }
 
-async function setDeviceEnabled(serial, enabled) {
+function setDeviceEnabledWithReason(serial) {
+  const reason = prompt('请输入禁用原因（可选，如：账号异常、设备故障等）', '人工手动禁用');
+  if (reason === null) return; // 点了取消
+  setDeviceEnabled(serial, false, reason);
+}
+
+async function setDeviceEnabled(serial, enabled, reason = '') {
   try {
+    const body = { enabled };
+    if (!enabled && reason) body.reason = reason;
     const res = await fetch(`/api/admin/devices/${encodeURIComponent(serial)}/enable`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'X-Admin-Key': adminKey },
-      body: JSON.stringify({ enabled })
+      body: JSON.stringify(body)
     });
     const { code, msg } = await res.json();
     showToast(code === 200 ? (enabled ? '设备已启用' : '设备已禁用') : (msg || '操作失败'));

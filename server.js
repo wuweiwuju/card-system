@@ -534,10 +534,12 @@ app.get('/api/admin/devices', adminAuth, async (req, res) => {
 // 启用/禁用设备
 app.post('/api/admin/devices/:serial/enable', adminAuth, async (req, res) => {
   const { serial } = req.params;
-  const { enabled } = req.body;
+  const { enabled, reason } = req.body;
   if (enabled === undefined) return res.json({ code: 400, msg: '请提供 enabled 参数' });
   try {
-    const data = await fetchDeviceApi(`/api/v1/devices/${serial}/enable`, 'POST', { enabled });
+    const body = { enabled };
+    if (reason) body.reason = reason;
+    const data = await fetchDeviceApi(`/api/v1/devices/${serial}/enable`, 'POST', body);
     res.json({ code: 200, data });
   } catch (e) {
     res.json({ code: 502, msg: '操作失败: ' + e.message });
