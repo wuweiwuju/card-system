@@ -24,16 +24,17 @@ const DEVICE_TYPE_LABEL = {
 };
 
 // ── 登录 ──────────────────────────────────────────────────
-function login() {
+async function login() {
   adminKey = document.getElementById('admin-key').value.trim();
   if (!adminKey) return;
-  Promise.all([fetchCards(), fetchConfig()]).then(([ok]) => {
-    if (ok) {
-      document.getElementById('login-panel').style.display = 'none';
-      document.getElementById('admin-panel').style.display = 'block';
-      onCardTypeChange();
-    }
-  });
+  // 先加载配置，确保类型名可用，再渲染卡密列表
+  await fetchConfig();
+  const ok = await fetchCards();
+  if (ok) {
+    document.getElementById('login-panel').style.display = 'none';
+    document.getElementById('admin-panel').style.display = 'block';
+    onCardTypeChange();
+  }
 }
 
 function logout() {

@@ -166,16 +166,17 @@ async function dbListCards() {
 }
 
 function pgRowToCard(row) {
+  const toISO = v => v ? new Date(v).toISOString() : null;
   return {
     token: row.token,
-    createdAt: row.created_at,
-    expiresAt: row.expires_at,
+    createdAt: toISO(row.created_at),
+    expiresAt: toISO(row.expires_at),
     days: row.days,
     cardType: row.card_type || 'monthly',
     boundIp: row.bound_ip,
     boundDevice: row.bound_device,
     boundDeviceType: row.bound_device_type,
-    boundAt: row.bound_at,
+    boundAt: toISO(row.bound_at),
     status: row.status,
     lastQrScan: row.last_qr_scan,
     scanLimit: row.scan_limit ?? 4,
