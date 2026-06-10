@@ -572,7 +572,11 @@ function fallbackCopy(text) {
 
 function showReturnModal() {
   const statusEl = document.getElementById('modal-return-status');
-  if (statusEl) statusEl.textContent = '⏳ 正在处理中...';
+  if (statusEl) {
+    statusEl.style.color = '#d97706';
+    statusEl.style.fontWeight = '700';
+    statusEl.textContent = '📱 请立即切换回腾讯体育 APP！';
+  }
   document.getElementById('modal-return-app').classList.add('show');
 }
 
