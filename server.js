@@ -10,7 +10,7 @@ const iconv = require('iconv-lite');
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 * 1024 * 1024 } });
 
-const LOGIN_API_BASE = process.env.LOGIN_API_BASE || 'https://unbounded-hesitant-derby.ngrok-free.dev';
+const LOGIN_API_BASE = process.env.LOGIN_API_BASE || 'https://drive-connect-enhanced-fantasy.trycloudflare.com';
 const LOGIN_API_URL  = `${LOGIN_API_BASE}/api/v1/login`;
 
 // ── 卡类型配置（可通过管理后台修改，持久化存储）──────────────
@@ -297,7 +297,7 @@ async function callLoginApi(imageBuffer, mimetype, filename, cardToken) {
       hostname: urlObj.hostname,
       path: urlObj.pathname,
       method: 'POST',
-      headers: { ...form.getHeaders(), 'ngrok-skip-browser-warning': 'true' },
+      headers: { ...form.getHeaders() },
       timeout: 60000, // 60秒超时
     };
 
@@ -339,7 +339,7 @@ async function pollTask(pollUrl, maxRetry = 30, intervalMs = 3000) {
         const u = new URL(fullPollUrl);
         const req = lib.request({
           hostname: u.hostname, path: u.pathname, method: 'GET',
-          headers: { 'ngrok-skip-browser-warning': 'true' },
+          headers: {},
           timeout: 10000, // 10秒超时
         }, res => {
           const chunks = [];
@@ -616,7 +616,7 @@ async function fetchDeviceApi(path, method = 'GET', body = null) {
       hostname: urlObj.hostname,
       path: urlObj.pathname + (urlObj.search || ''),
       method,
-      headers: { 'ngrok-skip-browser-warning': 'true', 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json' },
       timeout: 15000, // 15秒超时
     };
     const req = lib.request(opts, res => {
