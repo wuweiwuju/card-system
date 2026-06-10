@@ -375,8 +375,12 @@ async function doUploadFile(file, qrText) {
   try {
     const res = await fetch('/api/scan-qr', { method: 'POST', body: formData });
     clearInterval(waitTimer);
+    const rawText = await res.text();
+    let parsed;
+    try { parsed = JSON.parse(rawText); }
+    catch (e) { throw new Error('服务器错误，请稍后重试（' + rawText.slice(0, 60) + '）'); }
     // 释放锁，但如果是 pending 状态要等轮询结束才真正解锁
-    const { code, msg, data } = await res.json();
+    const { code, msg, data } = parsed;
 
     if (code !== 200) isUploading = false; // 失败立即解锁
     document.querySelectorAll('.btn-scan-new').forEach(b => { b.disabled = false; b.style.opacity = '1'; });
@@ -448,7 +452,9 @@ async function pollTaskStatus(resEl, retries = 30) {
     await new Promise(r => setTimeout(r, interval));
     try {
       const res = await fetch(`/api/task-status?token=${encodeURIComponent(token)}`);
-      const { code, data } = await res.json();
+      let parsed2;
+      try { parsed2 = JSON.parse(await res.text()); } catch (e) { continue; }
+      const { code, data } = parsed2;
       if (code !== 200 || !data) continue;
 
       if (data.status === 'success') {
