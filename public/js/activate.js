@@ -416,7 +416,17 @@ async function doUploadFile(file, qrText) {
     clearInterval(waitTimer);
     isUploading = false;
     document.querySelectorAll('.btn-scan-new').forEach(b => { b.disabled = false; b.style.opacity = '1'; });
-    resEl.textContent = '✗ 上传失败：' + e.message;
+    const isNetworkErr = e.message === 'Load failed' || e.message === 'Failed to fetch' || e.message === 'Network request failed';
+    resEl.style.display = 'block';
+    resEl.style.background = '#fee2e2';
+    resEl.style.borderColor = '#dc2626';
+    resEl.style.color = '#7f1d1d';
+    resEl.innerHTML = isNetworkErr
+      ? `<div style="font-size:15px;font-weight:700;margin-bottom:6px">⚠️ 网络连接失败</div>
+         <div style="font-size:13px;margin-bottom:10px">可能是网络波动或服务器正在启动，请稍后重试</div>
+         <button onclick="retryUpload()" style="width:100%;padding:10px;background:#dc2626;color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:700;cursor:pointer">🔄 重新上传</button>`
+      : `<div style="font-size:15px;font-weight:700;margin-bottom:6px">✗ 上传失败</div>
+         <div style="font-size:13px">${e.message}</div>`;
   }
 }
 
@@ -506,6 +516,11 @@ async function pollTaskStatus(resEl, retries = 30) {
   }
   resEl.textContent = '⌛ 处理超时，请稍后刷新页面查看结果';
   isUploading = false;
+}
+
+function retryUpload() {
+  document.getElementById('qr-result').style.display = 'none';
+  triggerFileInput();
 }
 
 // ── 唤起 APP ──────────────────────────────────────────────
