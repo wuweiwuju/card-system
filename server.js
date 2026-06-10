@@ -583,6 +583,24 @@ app.post('/api/admin/devices/:serial/enable', adminAuth, async (req, res) => {
   }
 });
 
+// 导出全量数据库备份（JSON）
+app.get('/api/admin/backup', adminAuth, async (req, res) => {
+  try {
+    const cards = await dbListCards();
+    const payload = {
+      exportedAt: new Date().toISOString(),
+      total: cards.length,
+      cards,
+    };
+    const filename = `cards_backup_${new Date().toISOString().slice(0,10)}.json`;
+    res.setHeader('Content-Type', 'application/json; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.send(JSON.stringify(payload, null, 2));
+  } catch (e) {
+    res.status(500).json({ code: 500, msg: '导出失败: ' + e.message });
+  }
+});
+
 app.get('/activate', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });

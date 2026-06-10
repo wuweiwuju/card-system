@@ -379,6 +379,23 @@ function copyTokenDirect(token) {
   navigator.clipboard.writeText(token).then(() => showToast('卡密已复制'));
 }
 
+// ── 备份数据库 ────────────────────────────────────────────
+async function backupDB() {
+  showToast('正在导出，请稍候...');
+  try {
+    const res = await fetch('/api/admin/backup', { headers: { 'X-Admin-Key': adminKey } });
+    if (!res.ok) { showToast('导出失败'); return; }
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `cards_backup_${new Date().toISOString().slice(0,10)}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+    showToast('✓ 备份已下载');
+  } catch (e) { showToast('导出失败: ' + e.message); }
+}
+
 // ── 导出 CSV ──────────────────────────────────────────────
 function exportCSV(todayOnlyFlag = false) {
   const source = todayOnlyFlag ? allCards.filter(c => isToday(c.createdAt)) : allCards;
