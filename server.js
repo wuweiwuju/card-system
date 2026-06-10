@@ -13,15 +13,47 @@ const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 *
 const LOGIN_API_BASE = process.env.LOGIN_API_BASE || 'https://unbounded-hesitant-derby.ngrok-free.dev';
 const LOGIN_API_URL  = `${LOGIN_API_BASE}/api/v1/login`;
 
-// ── 卡类型配置（可通过管理后台修改）─────────────────────────
+// ── 卡类型配置（可通过管理后台修改，持久化存储）──────────────
 const DEFAULT_CARD_CONFIG = {
-  monthly:  { name: '月卡',    days: 28,  scanLimit: 4,  deviceLimit: 1 },
-  seasonal: { name: '季卡',    days: 90,  scanLimit: 6,  deviceLimit: 2 },
-  yearly:   { name: '年卡',    days: 365, scanLimit: 12, deviceLimit: 2 },
+  monthly:  { name: '月卡',      days: 28,  scanLimit: 4,  deviceLimit: 1 },
+  seasonal: { name: '季卡',      days: 90,  scanLimit: 6,  deviceLimit: 2 },
+  yearly:   { name: '年卡',      days: 365, scanLimit: 12, deviceLimit: 2 },
   nba:      { name: 'NBA赛季卡', days: 210, scanLimit: 6,  deviceLimit: 2 },
   f1:       { name: 'F1赛季卡',  days: 180, scanLimit: 6,  deviceLimit: 2 },
 };
 let cardConfig = { ...DEFAULT_CARD_CONFIG };
+
+// 配置持久化（PG 用 app_config 表，本地用 config.json）
+const CONFIG_FILE = path.join(__dirname, 'data', 'config.json');
+
+async function loadCardConfig() {
+  try {
+    if (pool) {
+      await pool.query(`CREATE TABLE IF NOT EXISTS app_config (key TEXT PRIMARY KEY, value JSONB NOT NULL)`);
+      const { rows } = await pool.query(`SELECT value FROM app_config WHERE key='card_config'`);
+      if (rows.length) { cardConfig = rows[0].value; console.log('[CONFIG] 已从数据库加载套餐配置'); return; }
+    } else if (fs.existsSync(CONFIG_FILE)) {
+      const saved = JSON.parse(fs.readFileSync(CONFIG_FILE, 'utf-8'));
+      if (saved.cardConfig) { cardConfig = saved.cardConfig; console.log('[CONFIG] 已从文件加载套餐配置'); return; }
+    }
+  } catch (e) { console.error('[CONFIG] 加载配置失败，使用默认值', e.message); }
+}
+
+async function saveCardConfig() {
+  try {
+    if (pool) {
+      await pool.query(
+        `INSERT INTO app_config (key, value) VALUES ('card_config', $1)
+         ON CONFLICT (key) DO UPDATE SET value = excluded.value`,
+        [JSON.stringify(cardConfig)]
+      );
+    } else {
+      const dir = path.dirname(CONFIG_FILE);
+      if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+      fs.writeFileSync(CONFIG_FILE, JSON.stringify({ cardConfig }, null, 2));
+    }
+  } catch (e) { console.error('[CONFIG] 保存配置失败', e.message); }
+}
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -63,9 +95,11 @@ if (DATABASE_URL) {
     await pool.query(`ALTER TABLE cards ADD COLUMN IF NOT EXISTS scan_used INT NOT NULL DEFAULT 0`).catch(()=>{});
     await pool.query(`ALTER TABLE cards ADD COLUMN IF NOT EXISTS device_limit INT NOT NULL DEFAULT 1`).catch(()=>{});
     console.log('PostgreSQL 已连接');
+    await loadCardConfig();
   }).catch(e => console.error('DB 初始化失败', e));
 } else {
   console.log('未检测到 DATABASE_URL，使用本地 JSON 存储');
+  loadCardConfig();
 }
 
 // ── JSON 降级存储 ─────────────────────────────────────────
@@ -495,7 +529,7 @@ app.get('/api/admin/card-config', adminAuth, (req, res) => {
   res.json({ code: 200, data: cardConfig });
 });
 
-app.put('/api/admin/card-config', adminAuth, (req, res) => {
+app.put('/api/admin/card-config', adminAuth, async (req, res) => {
   const updates = req.body;
   // 先清空再重建，支持新增和删除
   cardConfig = {};
@@ -508,6 +542,7 @@ app.put('/api/admin/card-config', adminAuth, (req, res) => {
       deviceLimit: Number(u.deviceLimit) || 1,
     };
   }
+  await saveCardConfig();
   res.json({ code: 200, msg: '配置已更新', data: cardConfig });
 });
 

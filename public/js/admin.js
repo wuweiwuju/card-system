@@ -11,13 +11,10 @@ const STATUS_LABEL = {
   disabled: '<span class="badge" style="background:#f0f0f0;color:#888">已禁用</span>',
 };
 
-const CARD_TYPE_LABEL = {
-  monthly:  '月卡',
-  seasonal: '季卡',
-  yearly:   '年卡',
-  nba:      'NBA赛季卡',
-  f1:       'F1赛季卡',
-};
+// 动态从 cardConfigData 获取类型名，不再硬编码
+function getCardTypeName(type) {
+  return (cardConfigData[type] && cardConfigData[type].name) || type || '—';
+}
 
 const DEVICE_TYPE_LABEL = {
   phone: '📱 手机',
@@ -120,7 +117,7 @@ function renderTable(pagination = null) {
     const scanInfo = `${c.scanUsed ?? 0}/${c.scanLimit ?? 4}`;
     const scanColor = (c.scanUsed ?? 0) >= (c.scanLimit ?? 4) ? 'color:#e05252;font-weight:700' : 'color:#18a058';
     const devType = c.boundDeviceType ? (DEVICE_TYPE_LABEL[c.boundDeviceType] || c.boundDeviceType) : '—';
-    const cardTypeName = CARD_TYPE_LABEL[c.cardType] || c.cardType || '—';
+    const cardTypeName = getCardTypeName(c.cardType);
     const toggleBtn = c.status === 'disabled'
       ? `<button class="btn-warn" onclick="toggleCard('${c.token}','enable')">启用</button>`
       : `<button class="btn-warn" onclick="toggleCard('${c.token}','disable')">禁用</button>`;
@@ -293,6 +290,15 @@ function renderGenTypeOptions() {
   sel.innerHTML = Object.entries(cardConfigData)
     .map(([k, v]) => `<option value="${k}"${k === cur ? ' selected' : ''}>${v.name}</option>`)
     .join('');
+  // 同步更新筛选下拉
+  const filterType = document.getElementById('filter-type');
+  if (filterType) {
+    const curFilter = filterType.value;
+    filterType.innerHTML = '<option value="">全部类型</option>' +
+      Object.entries(cardConfigData)
+        .map(([k, v]) => `<option value="${k}"${k === curFilter ? ' selected' : ''}>${v.name}</option>`)
+        .join('');
+  }
   onCardTypeChange();
 }
 
@@ -464,7 +470,7 @@ function exportCSV(todayOnlyFlag = false) {
 
   const rows = [['卡密', '卡类型', '状态', '到期时间', '绑定IP', '绑定设备类型', '扫码已用', '扫码上限', '设备上限', '绑定时间', '创建时间']];
   source.forEach(c => {
-    rows.push([c.token, CARD_TYPE_LABEL[c.cardType] || c.cardType || '', c.status,
+    rows.push([c.token, getCardTypeName(c.cardType), c.status,
       c.expiresAt || '', c.boundIp || '', c.boundDeviceType || '',
       c.scanUsed ?? 0, c.scanLimit ?? 4, c.deviceLimit ?? 1, c.boundAt || '', c.createdAt || '']);
   });
