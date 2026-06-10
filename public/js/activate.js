@@ -350,6 +350,9 @@ async function doUploadFile(file, qrText) {
   // 立即弹出提示弹窗，让用户马上切回 APP
   showReturnModal();
 
+  // 用 setTimeout 让弹窗先渲染，再执行压缩/上传
+  await new Promise(r => setTimeout(r, 50));
+
   // 禁用两个按钮
   document.querySelectorAll('.btn-scan-new').forEach(b => { b.disabled = true; b.style.opacity = '.5'; });
 
