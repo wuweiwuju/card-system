@@ -123,15 +123,17 @@
     <div class="top-banner">
       <div class="banner-top">
         <span class="banner-title">🎬 会员在线激活</span>
-        <button class="btn-service-new" onclick="openService()" style="background:rgba(255,255,255,.2);color:#fff;border:none;border-radius:20px;padding:6px 14px;font-size:13px;cursor:pointer;display:flex;align-items:center;gap:5px;">
-          <svg viewBox="0 0 24 24" style="width:13px;height:13px;fill:#fff"><path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2z"/></svg>
-          客服
-        </button>
+        <div style="display:flex;gap:6px;align-items:center">
+          <button onclick="copyToken()" style="background:rgba(255,255,255,.2);color:#fff;border:none;border-radius:16px;padding:5px 12px;font-size:12px;font-weight:600;cursor:pointer">复制</button>
+          <button onclick="openService()" style="background:rgba(255,255,255,.2);color:#fff;border:none;border-radius:16px;padding:5px 12px;font-size:12px;cursor:pointer;display:flex;align-items:center;gap:4px">
+            <svg viewBox="0 0 24 24" style="width:12px;height:12px;fill:#fff"><path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2z"/></svg>
+            客服
+          </button>
+        </div>
       </div>
       <div class="token-row" style="display:flex;align-items:center;gap:8px;background:rgba(255,255,255,.12);border-radius:10px;padding:8px 12px;margin-bottom:14px;">
         <span style="font-size:12px;opacity:.8;flex-shrink:0">卡密</span>
         <span class="token-val" id="display-token" style="font-size:11px;font-family:monospace;flex:1;word-break:break-all;opacity:.95">加载中...</span>
-        <button class="btn-copy-token" onclick="copyToken()" style="background:rgba(255,255,255,.25);color:#fff;border:none;border-radius:8px;padding:5px 12px;font-size:12px;cursor:pointer;flex-shrink:0;font-weight:600">复制</button>
       </div>
       <div class="banner-stats">
         <div class="stat-item">
