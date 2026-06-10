@@ -403,12 +403,21 @@ app.post('/api/scan-qr', upload.single('image'), async (req, res) => {
       const result = await callLoginApi(req.file.buffer, req.file.mimetype, req.file.originalname, token);
 
       if (result.status !== 200 && result.status !== 202) {
-        const isDown = result.status === 503 || result.status === 502 || result.status === 504;
-        return res.json({
-          code: 502,
-          msg: isDown ? '服务暂时不可用，请稍后重试' : '登录接口返回错误',
-          data: result.body
-        });
+        const isDown = result.status === 503 || result.status === 502 || result.status === 504 || result.status === 0;
+        const isBusy = result.status === 409;
+        // 从响应体提取可读信息
+        const bodyMsg = (typeof result.body === 'object' && result.body)
+          ? (result.body.message || result.body.msg || result.body.error || '')
+          : (typeof result.body === 'string' ? result.body.slice(0, 100) : '');
+        const userMsg = isDown
+          ? '登录服务暂时不可用，请稍后重试'
+          : isBusy
+            ? '当前已有任务处理中，请等待完成后再上传'
+            : bodyMsg
+              ? `接口错误：${bodyMsg}`
+              : `登录接口返回错误（状态码 ${result.status}）`;
+        console.log(`[SCAN] 登录API异常 status=${result.status} body=${JSON.stringify(result.body)}`);
+        return res.json({ code: 502, msg: userMsg, data: result.body });
       }
 
       const submitResult = result.body;
