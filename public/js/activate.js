@@ -214,8 +214,8 @@ function triggerFileInput() {
 
 // ── 状态提示块 ────────────────────────────────────────────
 function showStatusBlock(status) {
-  document.querySelector('.scan-card').style.display = 'none';
-  document.querySelector('.btn-unbind').style.display = 'none';
+  const scanCard = document.querySelector('.scan-card');
+  if (scanCard) scanCard.style.display = 'none';
 
   const configs = {
     disabled: {
@@ -251,8 +251,8 @@ function showStatusBlock(status) {
 
 // ── 非本机提示 ────────────────────────────────────────────
 function showBoundWarning() {
-  document.querySelector('.scan-card').style.display = 'none';
-  document.querySelector('.btn-unbind').style.display = 'none';
+  const scanCard = document.querySelector('.scan-card');
+  if (scanCard) scanCard.style.display = 'none';
 
   const warn = document.createElement('div');
   warn.style.cssText = 'background:#fee2e2;border:2px solid #dc2626;border-radius:14px;padding:20px;text-align:center;';
