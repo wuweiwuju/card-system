@@ -347,6 +347,9 @@ async function doUploadFile(file, qrText) {
   if (isUploading) { showToast('正在处理中，请勿重复提交'); return; }
   isUploading = true;
 
+  // 立即弹出提示弹窗，让用户马上切回 APP
+  showReturnModal();
+
   // 禁用两个按钮
   document.querySelectorAll('.btn-scan-new').forEach(b => { b.disabled = true; b.style.opacity = '.5'; });
 
@@ -402,8 +405,6 @@ async function doUploadFile(file, qrText) {
         <div style="font-size:15px;font-weight:700;color:#d97706">📱 请立即返回腾讯体育 APP</div>
         <div style="font-size:13px;margin-top:4px;color:#78350f">保持二维码页面不要关闭，等待登录完成...</div>
       `;
-      // 立即弹出提示弹窗
-      showReturnModal();
       pollTaskStatus(resEl);
     } else if (code === 200) {
       resEl.style.background = '#f0fdf4';
