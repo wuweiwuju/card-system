@@ -62,7 +62,12 @@ function switchTab(tab) {
 async function fetchCards(page = 1) {
   currentPage = page;
   try {
-    const res = await fetch(`/api/admin/cards?page=${page}&limit=${PAGE_SIZE}`, { headers: { 'X-Admin-Key': adminKey } });
+    const search   = document.getElementById('search-input').value.trim();
+    const today    = document.getElementById('filter-today')?.checked ? '1' : '';
+    const status   = document.getElementById('filter-status')?.value || '';
+    const cardType = document.getElementById('filter-type')?.value || '';
+    const params = new URLSearchParams({ page, limit: PAGE_SIZE, search, today, status, cardType });
+    const res = await fetch(`/api/admin/cards?${params}`, { headers: { 'X-Admin-Key': adminKey } });
     const json = await res.json();
     if (json.code === 401) { document.getElementById('login-err').textContent = '密码错误'; return false; }
     if (json.code !== 200) { showToast(json.msg); return false; }
@@ -71,6 +76,8 @@ async function fetchCards(page = 1) {
     return true;
   } catch (e) { showToast('网络错误'); return false; }
 }
+
+function applyFilter() { fetchCards(1); }
 
 async function fetchConfig() {
   try {
@@ -92,23 +99,23 @@ function isToday(isoStr) {
 }
 
 function renderTable(pagination = null) {
-  const q = document.getElementById('search-input').value.toLowerCase();
-  const todayOnly = document.getElementById('filter-today')?.checked;
-  const filtered = allCards.filter(c => {
-    const matchQ = !q || c.token.toLowerCase().includes(q) ||
-      (c.boundIp && c.boundIp.includes(q)) ||
-      (c.cardType && c.cardType.includes(q));
-    const matchDay = !todayOnly || isToday(c.createdAt);
-    return matchQ && matchDay;
-  });
-
   const total = pagination ? pagination.total : allCards.length;
   const pages = pagination ? pagination.pages : 1;
-  const page = pagination ? pagination.page : 1;
+  const page  = pagination ? pagination.page  : 1;
   document.getElementById('card-count').textContent = `共 ${total} 个卡密，当前第 ${page}/${pages} 页`;
 
   const tbody = document.getElementById('table-body');
-  tbody.innerHTML = filtered.map(c => {
+  // 表头加全选框
+  const thead = document.querySelector('#cards-table thead tr');
+  if (thead && !thead.querySelector('.th-check')) {
+    const th = document.createElement('th');
+    th.className = 'th-check';
+    th.style.width = '32px';
+    th.innerHTML = '<input type="checkbox" id="check-all" onchange="toggleCheckAll(this)" title="全选">';
+    thead.prepend(th);
+  }
+
+  tbody.innerHTML = allCards.map(c => {
     const exp = c.expiresAt ? new Date(c.expiresAt).toLocaleString('zh-CN') : '—';
     const scanInfo = `${c.scanUsed ?? 0}/${c.scanLimit ?? 4}`;
     const scanColor = (c.scanUsed ?? 0) >= (c.scanLimit ?? 4) ? 'color:#e05252;font-weight:700' : 'color:#18a058';
@@ -120,7 +127,11 @@ function renderTable(pagination = null) {
     const createdAt = c.createdAt ? new Date(c.createdAt).toLocaleString('zh-CN', {month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'}) : '—';
     const todayMark = isToday(c.createdAt) ? '<span style="background:#dcfce7;color:#16a34a;border-radius:4px;padding:1px 5px;font-size:11px;margin-left:4px">今日</span>' : '';
     const devIcon = devType !== '—' ? devType + ' ' : '';
-    return `<tr>
+    const rowBg = c.status === 'expired' ? 'background:#fff8f8' : '';
+    return `<tr style="${rowBg}">
+      <td style="text-align:center;padding:6px 4px">
+        <input type="checkbox" class="row-check" value="${c.token}" onchange="onRowCheck()">
+      </td>
       <td>
         <span style="font-family:monospace;font-size:12px;cursor:pointer" title="点击复制" onclick="copyTokenDirect('${c.token}')">${c.token.slice(0,8)}…${c.token.slice(-4)}</span>
       </td>
@@ -146,7 +157,6 @@ function renderTable(pagination = null) {
     </tr>`;
   }).join('');
 
-  // 分页控件
   renderPagination(page, pages);
 }
 
@@ -170,6 +180,57 @@ function renderPagination(page, pages) {
   }
   if (page < pages) html += `<button class="btn-warn" style="padding:5px 12px" onclick="fetchCards(${page+1})">下一页 ›</button>`;
   el.innerHTML = html;
+}
+
+// ── 复选框 & 批量删除 ─────────────────────────────────────
+function toggleCheckAll(cb) {
+  document.querySelectorAll('.row-check').forEach(c => c.checked = cb.checked);
+}
+
+function onRowCheck() {
+  const all  = document.querySelectorAll('.row-check');
+  const chk  = document.querySelectorAll('.row-check:checked');
+  const allCb = document.getElementById('check-all');
+  if (allCb) allCb.checked = all.length > 0 && chk.length === all.length;
+}
+
+function getCheckedTokens() {
+  return [...document.querySelectorAll('.row-check:checked')].map(c => c.value);
+}
+
+async function deleteSelected() {
+  const tokens = getCheckedTokens();
+  if (!tokens.length) { showToast('请先勾选要删除的卡密'); return; }
+  if (!confirm(`确认删除选中的 ${tokens.length} 个卡密？此操作不可恢复。`)) return;
+  try {
+    const res = await fetch('/api/admin/cards/batch-delete', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Admin-Key': adminKey },
+      body: JSON.stringify({ tokens })
+    });
+    const { code, msg } = await res.json();
+    showToast(msg);
+    if (code === 200) await fetchCards(currentPage);
+  } catch (e) { showToast('操作失败'); }
+}
+
+async function deleteExpired() {
+  if (!confirm('确认删除所有已过期的卡密？此操作不可恢复。')) return;
+  try {
+    // 先拉取所有过期卡密（不分页，status=expired）
+    const res = await fetch('/api/admin/cards?page=1&limit=200&status=expired', { headers: { 'X-Admin-Key': adminKey } });
+    const { code, data } = await res.json();
+    if (code !== 200 || !data.length) { showToast('暂无过期卡密'); return; }
+    const tokens = data.map(c => c.token);
+    const res2 = await fetch('/api/admin/cards/batch-delete', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Admin-Key': adminKey },
+      body: JSON.stringify({ tokens })
+    });
+    const { msg } = await res2.json();
+    showToast(msg);
+    await fetchCards(1);
+  } catch (e) { showToast('操作失败'); }
 }
 
 // ── 套餐配置 ──────────────────────────────────────────────

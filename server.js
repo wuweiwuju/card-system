@@ -170,11 +170,14 @@ function adminAuth(req, res, next) {
 }
 
 // ── 智能解码（优先 UTF-8，乱码则降级 GBK）────────────────────
-function decodeBuf(buf) {
+function decodeBuf(buf, contentType = '') {
+  // Content-Type 明确指定编码
+  if (/gbk|gb2312|gb18030/i.test(contentType)) {
+    return iconv.decode(buf, 'gbk');
+  }
   const utf8 = buf.toString('utf-8');
-  // 简单检测乱码：含大量替换字符说明不是 UTF-8
-  const garbled = (utf8.match(/�/g) || []).length;
-  if (garbled > 2) {
+  // U+FFFD = 无效UTF-8字节替换符；U+9FDF(锟) = GBK当UTF-8解析的经典乱码特征
+  if (utf8.includes('�') || utf8.includes('鿟')) {
     try { return iconv.decode(buf, 'gbk'); } catch(e) {}
   }
   return utf8;
@@ -270,7 +273,7 @@ async function callLoginApi(imageBuffer, mimetype, filename, cardToken) {
       res.on('data', chunk => chunks.push(chunk));
       res.on('end', () => {
         const buf = Buffer.concat(chunks);
-        const text = decodeBuf(buf);
+        const text = decodeBuf(buf, res.headers['content-type'] || '');
         console.log(`[LOGIN] 提交响应 status=${res.statusCode} body=${text}`);
         try { resolve({ status: res.statusCode, body: JSON.parse(text) }); }
         catch (e) { resolve({ status: res.statusCode, body: text }); }
@@ -309,7 +312,7 @@ async function pollTask(pollUrl, maxRetry = 30, intervalMs = 3000) {
           res.on('data', chunk => chunks.push(chunk));
           res.on('end', () => {
             const buf = Buffer.concat(chunks);
-            const text = decodeBuf(buf);
+            const text = decodeBuf(buf, res.headers['content-type'] || '');
             try { resolve(JSON.parse(text)); }
             catch(e) { resolve({ status: 'error', raw: text }); }
           });
@@ -430,7 +433,7 @@ app.get('/api/task-status', async (req, res) => {
 
 app.get('/api/admin/cards', adminAuth, async (req, res) => {
   try {
-    const { page = 1, limit = 50, search = '', today = '' } = req.query;
+    const { page = 1, limit = 50, search = '', today = '', status = '', cardType = '' } = req.query;
     const pageNum = Math.max(1, parseInt(page));
     const limitNum = Math.min(200, Math.max(1, parseInt(limit)));
 
@@ -449,6 +452,10 @@ app.get('/api/admin/cards', adminAuth, async (req, res) => {
       const todayStr = new Date().toISOString().slice(0, 10);
       list = list.filter(c => c.createdAt && c.createdAt.slice(0, 10) === todayStr);
     }
+    // 状态过滤
+    if (status) list = list.filter(c => c.status === status);
+    // 卡类型过滤
+    if (cardType) list = list.filter(c => c.cardType === cardType);
 
     const total = list.length;
     const pages = Math.ceil(total / limitNum);
@@ -546,6 +553,21 @@ app.delete('/api/admin/cards/:token', adminAuth, async (req, res) => {
     if (!card) return res.json({ code: 404, msg: '卡密不存在' });
     await dbDeleteCard(token);
     res.json({ code: 200, msg: '已删除' });
+  } catch (e) { res.json({ code: 500, msg: '服务器错误' }); }
+});
+
+// 批量删除
+app.post('/api/admin/cards/batch-delete', adminAuth, async (req, res) => {
+  const { tokens } = req.body; // string[]
+  if (!Array.isArray(tokens) || !tokens.length)
+    return res.json({ code: 400, msg: '请提供 tokens 数组' });
+  try {
+    let count = 0;
+    for (const token of tokens) {
+      const card = await dbGetCard(token);
+      if (card) { await dbDeleteCard(token); count++; }
+    }
+    res.json({ code: 200, msg: `已删除 ${count} 个卡密` });
   } catch (e) { res.json({ code: 500, msg: '服务器错误' }); }
 });
 

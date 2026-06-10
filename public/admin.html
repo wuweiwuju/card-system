@@ -67,13 +67,32 @@
     <div id="tab-cards" class="tab-panel active">
       <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;flex-wrap:wrap">
         <input id="search-input" type="text" placeholder="搜索卡密 / IP..."
-          style="padding:8px 12px;border:1.5px solid #ddd;border-radius:8px;font-size:14px;width:180px;outline:none"
-          oninput="renderTable()">
+          style="padding:8px 12px;border:1.5px solid #ddd;border-radius:8px;font-size:14px;width:160px;outline:none"
+          oninput="applyFilter()">
+        <select id="filter-status" onchange="applyFilter()"
+          style="padding:8px 10px;border:1.5px solid #ddd;border-radius:8px;font-size:13px;color:#555;outline:none">
+          <option value="">全部状态</option>
+          <option value="unused">未激活</option>
+          <option value="active">已激活</option>
+          <option value="expired">已过期</option>
+          <option value="disabled">已禁用</option>
+        </select>
+        <select id="filter-type" onchange="applyFilter()"
+          style="padding:8px 10px;border:1.5px solid #ddd;border-radius:8px;font-size:13px;color:#555;outline:none">
+          <option value="">全部类型</option>
+          <option value="monthly">月卡</option>
+          <option value="seasonal">季卡</option>
+          <option value="yearly">年卡</option>
+          <option value="nba">NBA赛季卡</option>
+          <option value="f1">F1赛季卡</option>
+        </select>
         <label style="display:flex;align-items:center;gap:5px;font-size:13px;cursor:pointer;white-space:nowrap;color:#555">
-          <input type="checkbox" id="filter-today" onchange="renderTable()" style="width:14px;height:14px">
+          <input type="checkbox" id="filter-today" onchange="applyFilter()" style="width:14px;height:14px">
           今日创建
         </label>
-        <div style="margin-left:auto;display:flex;gap:8px">
+        <div style="margin-left:auto;display:flex;gap:8px;flex-wrap:wrap">
+          <button style="padding:7px 12px;background:#fee2e2;color:#dc2626;border:none;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer" onclick="deleteSelected()" title="删除勾选的卡密">🗑 删除选中</button>
+          <button style="padding:7px 12px;background:#fef3c7;color:#b45309;border:none;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer" onclick="deleteExpired()" title="删除所有已过期卡密">⏰ 删除过期</button>
           <button class="btn-primary" onclick="showGenPanel()">+ 批量生成</button>
           <button class="btn-primary" style="background:#18a058" onclick="exportCSV()">导出全部</button>
           <button class="btn-primary" style="background:#f59e0b" onclick="exportCSV(true)">导出今日</button>
