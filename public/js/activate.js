@@ -535,7 +535,28 @@ function openService() {
 
 function copyToken() {
   if (!token) return;
-  navigator.clipboard.writeText(token).then(() => showToast('卡密已复制'));
+  // 优先用 clipboard API，降级用 execCommand
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(token).then(() => showToast('卡密已复制')).catch(() => fallbackCopy(token));
+  } else {
+    fallbackCopy(token);
+  }
+}
+
+function fallbackCopy(text) {
+  const ta = document.createElement('textarea');
+  ta.value = text;
+  ta.style.cssText = 'position:fixed;top:0;left:0;opacity:0';
+  document.body.appendChild(ta);
+  ta.focus();
+  ta.select();
+  try {
+    document.execCommand('copy');
+    showToast('卡密已复制');
+  } catch (e) {
+    showToast('复制失败，请手动长按复制');
+  }
+  document.body.removeChild(ta);
 }
 
 function toggleTips() {
