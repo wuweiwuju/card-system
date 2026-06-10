@@ -253,6 +253,23 @@
     </div>
   </div>
 
+  <!-- 立即返回APP弹窗 -->
+  <div class="modal-mask" id="modal-return-app">
+    <div class="modal-box" style="text-align:center">
+      <div style="font-size:48px;margin-bottom:8px">📱</div>
+      <h3 style="font-size:20px;color:#d97706;margin-bottom:8px">二维码已提交！</h3>
+      <p style="font-size:16px;font-weight:700;color:#1a1a2e;margin-bottom:6px">请立即切换回<br>腾讯体育 APP</p>
+      <p style="font-size:13px;color:#666;margin-bottom:16px">保持二维码页面不要关闭<br>系统正在自动完成登录...</p>
+      <div id="modal-return-status" style="font-size:13px;color:#888;margin-bottom:14px;min-height:18px">⏳ 正在处理中...</div>
+      <button onclick="openTencentSports()" style="width:100%;padding:14px;background:linear-gradient(135deg,#1677ff,#0958d9);color:#fff;border:none;border-radius:12px;font-size:16px;font-weight:700;cursor:pointer;margin-bottom:10px">
+        📱 立即打开腾讯体育 APP
+      </button>
+      <button onclick="closeReturnModal()" style="width:100%;padding:12px;background:#f0f2f8;color:#888;border:none;border-radius:12px;font-size:14px;cursor:pointer">
+        留在此页面等待结果
+      </button>
+    </div>
+  </div>
+
   <!-- ZXing CDN -->
   <script src="https://unpkg.com/@zxing/library@0.19.1/umd/index.min.js"></script>
   <script src="/js/activate.js"></script>

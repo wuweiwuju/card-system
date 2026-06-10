@@ -401,10 +401,9 @@ async function doUploadFile(file, qrText) {
         <div style="font-size:16px;font-weight:700;margin-bottom:6px">⚠️ 二维码已提交！</div>
         <div style="font-size:15px;font-weight:700;color:#d97706">📱 请立即返回腾讯体育 APP</div>
         <div style="font-size:13px;margin-top:4px;color:#78350f">保持二维码页面不要关闭，等待登录完成...</div>
-        <button onclick="openTencentSports()" style="margin-top:10px;width:100%;padding:12px;background:linear-gradient(135deg,#1677ff,#0958d9);color:#fff;border:none;border-radius:10px;font-size:15px;font-weight:700;cursor:pointer;">
-          📱 点击返回腾讯体育 APP
-        </button>
       `;
+      // 立即弹出提示弹窗
+      showReturnModal();
       pollTaskStatus(resEl);
     } else if (code === 200) {
       resEl.style.background = '#f0fdf4';
@@ -484,6 +483,8 @@ async function pollTaskStatus(resEl, retries = 30) {
           <div style="font-size:16px;font-weight:700;color:#15803d">📱 请返回腾讯体育 APP</div>
           <div style="font-size:13px;margin-top:4px;color:#166534">已成功登录，返回 APP 即可正常使用会员</div>
         `;
+        // 更新弹窗为成功状态并3秒后自动关闭
+        updateReturnModal('success');
         showToast('✅ 登录成功！请返回腾讯体育 APP');
         isUploading = false;
         await loadCardInfo();
@@ -509,6 +510,8 @@ async function pollTaskStatus(resEl, retries = 30) {
             <div style="font-size:13px;margin-top:4px">重新获取二维码后再次上传</div>`;
         }
         resEl.innerHTML = errMsg;
+        // 更新弹窗为失败状态
+        updateReturnModal('failed');
         showToast('❌ 登录失败，请重试');
         isUploading = false;
         await loadCardInfo();
@@ -565,6 +568,39 @@ function fallbackCopy(text) {
     showToast('复制失败，请手动长按复制');
   }
   document.body.removeChild(ta);
+}
+
+function showReturnModal() {
+  const statusEl = document.getElementById('modal-return-status');
+  if (statusEl) statusEl.textContent = '⏳ 正在处理中...';
+  document.getElementById('modal-return-app').classList.add('show');
+}
+
+function closeReturnModal() {
+  document.getElementById('modal-return-app').classList.remove('show');
+}
+
+function updateReturnModal(result) {
+  const modal = document.getElementById('modal-return-app');
+  const statusEl = document.getElementById('modal-return-status');
+  if (!modal) return;
+  if (result === 'success') {
+    if (statusEl) {
+      statusEl.style.color = '#16a34a';
+      statusEl.style.fontWeight = '700';
+      statusEl.textContent = '✅ 登录成功！';
+    }
+    // 3秒后自动关闭弹窗
+    setTimeout(() => closeReturnModal(), 3000);
+  } else if (result === 'failed') {
+    if (statusEl) {
+      statusEl.style.color = '#dc2626';
+      statusEl.style.fontWeight = '700';
+      statusEl.textContent = '❌ 登录失败，请重新上传二维码';
+    }
+    // 5秒后自动关闭弹窗
+    setTimeout(() => closeReturnModal(), 5000);
+  }
 }
 
 function toggleTips() {
