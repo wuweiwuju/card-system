@@ -231,7 +231,7 @@ function showStatusBlock(status) {
     scan_limit: {
       bg: '#fef3c7', border: '#f59e0b', color: '#78350f',
       icon: '🔢', title: '扫码次数已用完',
-      desc: '此卡密的扫码次数已全部使用<br>请联系客服增加次数后继续使用',
+      desc: '您的卡密扫码次数已全部用完，无法继续登录<br>请联系客服增加次数或续期后再使用',
     },
   };
   const c = configs[status];
@@ -335,6 +335,14 @@ function uploadQR(input) {
 }
 
 async function doUploadFile(file, qrText) {
+  // 本地次数检查
+  if (cardInfo && cardInfo.scanLimit !== undefined) {
+    const remain = cardInfo.scanLimit - (cardInfo.scanUsed ?? 0);
+    if (remain <= 0) {
+      showStatusBlock('scan_limit');
+      return;
+    }
+  }
   // 防重复提交
   if (isUploading) { showToast('正在处理中，请勿重复提交'); return; }
   isUploading = true;
