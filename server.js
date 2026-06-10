@@ -6,6 +6,7 @@ const multer = require('multer');
 const https = require('https');
 const http = require('http');
 const FormData = require('form-data');
+const iconv = require('iconv-lite');
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 * 1024 * 1024 } });
 
@@ -168,6 +169,17 @@ function adminAuth(req, res, next) {
   next();
 }
 
+// ── 智能解码（优先 UTF-8，乱码则降级 GBK）────────────────────
+function decodeBuf(buf) {
+  const utf8 = buf.toString('utf-8');
+  // 简单检测乱码：含大量替换字符说明不是 UTF-8
+  const garbled = (utf8.match(/�/g) || []).length;
+  if (garbled > 2) {
+    try { return iconv.decode(buf, 'gbk'); } catch(e) {}
+  }
+  return utf8;
+}
+
 // ── 用户 API ──────────────────────────────────────────────
 
 app.get('/api/activate', async (req, res) => {
@@ -254,12 +266,14 @@ async function callLoginApi(imageBuffer, mimetype, filename, cardToken) {
 
     console.log(`[LOGIN] 提交二维码到 ${LOGIN_API_URL}`);
     const req = lib.request(options, res => {
-      let data = '';
-      res.on('data', chunk => data += chunk);
+      const chunks = [];
+      res.on('data', chunk => chunks.push(chunk));
       res.on('end', () => {
-        console.log(`[LOGIN] 提交响应 status=${res.statusCode} body=${data}`);
-        try { resolve({ status: res.statusCode, body: JSON.parse(data) }); }
-        catch (e) { resolve({ status: res.statusCode, body: data }); }
+        const buf = Buffer.concat(chunks);
+        const text = decodeBuf(buf);
+        console.log(`[LOGIN] 提交响应 status=${res.statusCode} body=${text}`);
+        try { resolve({ status: res.statusCode, body: JSON.parse(text) }); }
+        catch (e) { resolve({ status: res.statusCode, body: text }); }
       });
     });
     req.on('timeout', () => {
@@ -291,11 +305,13 @@ async function pollTask(pollUrl, maxRetry = 30, intervalMs = 3000) {
           headers: { 'ngrok-skip-browser-warning': 'true' },
           timeout: 10000, // 10秒超时
         }, res => {
-          let data = '';
-          res.on('data', chunk => data += chunk);
+          const chunks = [];
+          res.on('data', chunk => chunks.push(chunk));
           res.on('end', () => {
-            try { resolve(JSON.parse(data)); }
-            catch(e) { resolve({ status: 'error', raw: data }); }
+            const buf = Buffer.concat(chunks);
+            const text = decodeBuf(buf);
+            try { resolve(JSON.parse(text)); }
+            catch(e) { resolve({ status: 'error', raw: text }); }
           });
         });
         req.on('timeout', () => { req.destroy(); reject(new Error('POLL_TIMEOUT')); });
@@ -547,9 +563,13 @@ async function fetchDeviceApi(path, method = 'GET', body = null) {
       timeout: 15000, // 15秒超时
     };
     const req = lib.request(opts, res => {
-      let data = '';
-      res.on('data', c => data += c);
-      res.on('end', () => { try { resolve(JSON.parse(data)); } catch(e) { resolve({ raw: data }); } });
+      const chunks = [];
+      res.on('data', c => chunks.push(c));
+      res.on('end', () => {
+        const buf = Buffer.concat(chunks);
+        const text = decodeBuf(buf);
+        try { resolve(JSON.parse(text)); } catch(e) { resolve({ raw: text }); }
+      });
     });
     req.on('timeout', () => { req.destroy(); reject(new Error('DEVICE_API_TIMEOUT')); });
     req.on('error', reject);
