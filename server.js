@@ -1,6 +1,7 @@
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
+const fs = require('fs');
 const { v4: uuidv4 } = require('uuid');
 const multer = require('multer');
 const https = require('https');
@@ -103,7 +104,6 @@ if (DATABASE_URL) {
 }
 
 // ── JSON 降级存储 ─────────────────────────────────────────
-const fs = require('fs');
 const DATA_FILE = path.join(__dirname, 'data', 'cards.json');
 
 function readData() {
